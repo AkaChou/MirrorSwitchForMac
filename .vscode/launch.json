@@ -1,0 +1,44 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mirror switch for mac}",
+            "name": "Debug swift-executable",
+            "target": "swift-executable",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug swift-executable"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mirror switch for mac}",
+            "name": "Release swift-executable",
+            "target": "swift-executable",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release swift-executable"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mirror switch for mac}",
+            "name": "Debug MirrorSwitch",
+            "target": "MirrorSwitch",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug MirrorSwitch"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mirror switch for mac}",
+            "name": "Release MirrorSwitch",
+            "target": "MirrorSwitch",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release MirrorSwitch"
+        }
+    ]
+}

@@ -1,0 +1,136 @@
+//
+//  ConfigManager.swift
+//  MirrorSwitch
+//
+//  配置文件管理器
+//
+
+import Foundation
+
+/// 配置文件管理器（单例）
+class ConfigManager {
+    /// 单例实例
+    nonisolated(unsafe) static let shared = ConfigManager()
+
+    /// 应用目录
+    private let appDirectory: URL
+
+    /// 配置文件路径
+    private let configFile: URL
+
+    /// 选中状态文件路径
+    private let selectionFile: URL
+
+    /// 私有初始化方法
+    private init() {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        appDirectory = homeDir.appendingPathComponent(".mirror-switch")
+        configFile = appDirectory.appendingPathComponent("config.json")
+        selectionFile = appDirectory.appendingPathComponent("selection.json")
+
+        // 创建目录（如果不存在）
+        createDirectoryIfNeeded()
+    }
+
+    // MARK: - Public Methods
+
+    /// 加载配置
+    func loadConfig() -> AppConfiguration {
+        // 检查配置文件是否存在
+        guard FileManager.default.fileExists(atPath: configFile.path) else {
+            // 首次运行，保存默认配置
+            saveConfig(AppConfiguration.defaultConfig)
+            return AppConfiguration.defaultConfig
+        }
+
+        // 读取并解析配置文件
+        guard let data = try? Data(contentsOf: configFile),
+              let config = try? JSONDecoder().decode(AppConfiguration.self, from: data) else {
+            // 解析失败，返回默认配置
+            return AppConfiguration.defaultConfig
+        }
+
+        // 加载选中状态
+        var configWithSelection = config
+        for tool in ToolType.allCases {
+            if let sourceId = getCurrentSelection(for: tool) {
+                configWithSelection.currentSelection[tool.rawValue] = sourceId
+            }
+        }
+
+        return configWithSelection
+    }
+
+    /// 保存配置
+    func saveConfig(_ config: AppConfiguration) {
+        guard let data = try? JSONEncoder().encode(config) else {
+            print("⚠️ 配置编码失败")
+            return
+        }
+
+        do {
+            try data.write(to: configFile)
+            print("✓ 配置已保存")
+        } catch {
+            print("⚠️ 配置保存失败: \(error.localizedDescription)")
+        }
+    }
+
+    /// 获取指定工具的当前选中镜像源 ID
+    func getCurrentSelection(for tool: ToolType) -> String? {
+        guard FileManager.default.fileExists(atPath: selectionFile.path) else {
+            return nil
+        }
+
+        guard let data = try? Data(contentsOf: selectionFile),
+              let selections = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return nil
+        }
+
+        return selections[tool.rawValue]
+    }
+
+    /// 保存指定工具的选中镜像源 ID
+    func saveCurrentSelection(tool: ToolType, sourceId: String) {
+        // 读取现有选中状态
+        var selections: [String: String]
+        if let data = try? Data(contentsOf: selectionFile),
+           let existing = try? JSONDecoder().decode([String: String].self, from: data) {
+            selections = existing
+        } else {
+            selections = [:]
+        }
+
+        // 更新选中状态
+        selections[tool.rawValue] = sourceId
+
+        // 保存到文件
+        guard let data = try? JSONEncoder().encode(selections) else {
+            print("⚠️ 选中状态编码失败")
+            return
+        }
+
+        do {
+            try data.write(to: selectionFile)
+            print("✓ 选中状态已保存: \(tool.displayName) -> \(sourceId)")
+        } catch {
+            print("⚠️ 选中状态保存失败: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Private Methods
+
+    /// 创建应用目录（如果不存在）
+    private func createDirectoryIfNeeded() {
+        if !FileManager.default.fileExists(atPath: appDirectory.path) {
+            do {
+                try FileManager.default.createDirectory(at: appDirectory,
+                                                        withIntermediateDirectories: true,
+                                                        attributes: nil)
+                print("✓ 应用目录已创建: \(appDirectory.path)")
+            } catch {
+                print("⚠️ 创建应用目录失败: \(error.localizedDescription)")
+            }
+        }
+    }
+}
