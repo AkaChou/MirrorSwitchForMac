@@ -2,13 +2,15 @@
 //  ConfigModel.swift
 //  MirrorSwitch
 //
-//  应用配置数据结构
+//  应用配置数据结构（运行时状态）
+//  ⚠️ 注意：此文件仅用于向后兼容，实际配置应从 tools_config.json 加载
 //
 
 import Foundation
 
 /// 镜像源配置数据结构（运行时状态）
 /// 用于存储工具的镜像源列表和当前选择状态
+/// ⚠️ 这是一个向后兼容层，新代码应该使用 ConfigurationDrivenSourceManager
 struct MirrorSourceConfiguration: Codable {
     /// 配置版本
     let version: String
@@ -26,7 +28,7 @@ struct MirrorSourceConfiguration: Codable {
         self.currentSelection = currentSelection
     }
 
-    /// 默认配置
+    /// 默认配置（仅 npm，其他工具从配置文件动态加载）
     static var defaultConfig: MirrorSourceConfiguration {
         let npmSources = [
             MirrorSource(
@@ -55,88 +57,10 @@ struct MirrorSourceConfiguration: Codable {
             ),
         ]
 
-        let mavenSources = [
-            MirrorSource(
-                id: "maven-official",
-                name: "官方源",
-                url: "https://repo.maven.apache.org/maven2/",
-                description: "Maven 中央仓库"
-            ),
-            MirrorSource(
-                id: "maven-aliyun",
-                name: "阿里云",
-                url: "https://maven.aliyun.com/repository/public/",
-                description: "阿里云公共仓库"
-            ),
-            MirrorSource(
-                id: "maven-tencent",
-                name: "腾讯云",
-                url: "https://mirrors.cloud.tencent.com/repository/maven/",
-                description: "腾讯云公共仓库"
-            ),
-            MirrorSource(
-                id: "maven-huawei",
-                name: "华为云",
-                url: "https://mirrors.huaweicloud.com/repository/maven/",
-                description: "华为云 Maven 镜像"
-            ),
-            MirrorSource(
-                id: "maven-tsinghua",
-                name: "清华源",
-                url: "https://mirrors.tuna.tsinghua.edu.cn/maven/",
-                description: "清华大学镜像"
-            ),
-        ]
-
-        let homebrewSources = [
-            MirrorSource(
-                id: "homebrew-official",
-                name: "官方源",
-                url: "https://github.com/Homebrew/brew",
-                description: "Homebrew 官方"
-            ),
-            MirrorSource(
-                id: "homebrew-tsinghua",
-                name: "清华源",
-                url: "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git",
-                description: "清华大学镜像"
-            ),
-            MirrorSource(
-                id: "homebrew-ustc",
-                name: "中科大",
-                url: "https://mirrors.ustc.edu.cn/brew.git",
-                description: "中科大镜像"
-            ),
-        ]
-
-        let orbstackSources = [
-            MirrorSource(
-                id: "orbstack-official",
-                name: "官方源",
-                url: "https://docker.io",
-                description: "Docker Hub 官方"
-            ),
-            MirrorSource(
-                id: "orbstack-aliyun",
-                name: "阿里云",
-                url: "https://registry.cn-hangzhou.aliyuncs.com",
-                description: "阿里云容器镜像（仅阿里云内网推荐）"
-            ),
-            MirrorSource(
-                id: "orbstack-tencent",
-                name: "腾讯云",
-                url: "https://mirror.ccs.tencentyun.com",
-                description: "腾讯云容器镜像（仅腾讯云内网推荐）"
-            )
-        ]
-
         return MirrorSourceConfiguration(
             version: "1.0.0",
             tools: [
-                .npm: npmSources,
-                .maven: mavenSources,
-                .homebrew: homebrewSources,
-                .orbstack: orbstackSources
+                .npm: npmSources
             ],
             currentSelection: [:]
         )

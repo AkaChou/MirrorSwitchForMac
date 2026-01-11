@@ -20,6 +20,39 @@
 ./sync-configs.sh
 ```
 
+## 🎯 内置配置策略
+
+**内置配置只保留 npm 工具**，以保持应用轻量化。
+
+- **内置工具**: npm（Node Package Manager）
+- **其他工具**: 通过远程配置或用户本地配置动态加载
+
+### 配置加载优先级
+
+1. **远程配置**（最高优先级）- 从 GitHub 等远程 URL 加载
+2. **用户本地配置** - `~/.mirror-switch/tools_config.json`
+3. **内置默认配置**（最低优先级）- 只包含 npm
+
+### 使用远程配置
+
+通过环境变量指定远程配置地址：
+
+```bash
+export MIRROR_SWITCH_CONFIG_URL="https://raw.githubusercontent.com/user/repo/main/configs"
+```
+
+或在 `~/.mirror-switch/app_config.json` 中配置：
+
+```json
+{
+  "remoteConfig": {
+    "enabled": true,
+    "url": "https://raw.githubusercontent.com/user/repo/main/configs",
+    "updateInterval": 86400
+  }
+}
+```
+
 ## 📁 文件结构
 
 ```

@@ -130,63 +130,9 @@ actor ToolDetector {
             }
         }
 
-        // OrbStack 特殊处理：使用多种方式检测
-        if tool == .orbstack {
-            // 方法 1：读取 Info.plist（macOS 原生方式 - 推荐）
-            let plistResult = try? ShellExecutor.executeSync(
-                "/usr/libexec/PlistBuddy",
-                arguments: ["-c", "Print :CFBundleShortVersionString", "/Applications/OrbStack.app/Contents/Info.plist"]
-            )
-
-            if let output = plistResult?.standardOutput, plistResult?.exitCode == 0, !output.isEmpty {
-                let version = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !version.isEmpty {
-                    return "OrbStack \(version)"
-                }
-            }
-
-            // 方法 2：使用 orbctl 命令（CLI 方式）
-            let orbctlResult = try? await ShellExecutor.execute(
-                "/bin/sh",
-                arguments: ["-lc", "orbctl version"]
-            )
-
-            if let output = orbctlResult?.standardOutput, !output.isEmpty {
-                let lines = output.components(separatedBy: .newlines)
-                let versionLine = lines.first?.trimmingCharacters(in: .whitespaces)
-
-                // 过滤掉错误信息
-                if let version = versionLine, !version.lowercased().contains("not found") &&
-                   !version.lowercased().contains("command not found") &&
-                   !version.lowercased().contains("error") {
-                    return version
-                }
-            }
-
-            // 方法 3：通过 brew 检测
-            let brewResult = try? await ShellExecutor.execute(
-                "/bin/sh",
-                arguments: ["-lc", "brew list --versions orbstack"]
-            )
-
-            if let output = brewResult?.standardOutput, !output.isEmpty {
-                let versionLine = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !versionLine.isEmpty && !versionLine.contains("No such formula") {
-                    // brew list --versions orbstack 输出格式: "orbstack 1.6.2"
-                    let parts = versionLine.components(separatedBy: .whitespaces)
-                    if parts.count >= 2 {
-                        return "orbstack \(parts[1])"
-                    }
-                }
-            }
-
-            // 检查错误输出
-            if let error = orbctlResult?.standardError, !error.isEmpty {
-                debugLog("❌ OrbStack 版本检测失败: \(error)")
-            }
-
-            return nil
-        }
+        // ⚠️ 注意：OrbStack 等其他工具已移至配置文件中动态加载
+        // 这里只保留 npm 的特殊处理逻辑（如果有的话）
+        // 其他工具的检测逻辑应该从配置文件中获取
 
         // 其他工具使用常规检测方式
         let command = "\(tool.detectionCommand) \(tool.versionArguments.joined(separator: " "))"
@@ -385,14 +331,7 @@ actor ToolDetector {
     /// 判断是否应该递归搜索该目录
     nonisolated private func shouldRecursivelySearch(_ directory: String, for tool: ToolType) -> Bool {
         switch tool {
-        case .maven:
-            // Maven 通常安装在特定目录下
-            return directory.hasPrefix("/opt") || directory.hasPrefix("/usr/local")
         case .npm:
-            return false
-        case .homebrew:
-            return false
-        case .orbstack:
             return false
         }
     }
@@ -400,38 +339,17 @@ actor ToolDetector {
     /// 获取 Spotlight 搜索条件
     nonisolated private func getSpotlightSearchCriteria(for tool: ToolType) -> String {
         switch tool {
-        case .maven:
-            // 搜索 Maven 可执行文件或包含 Maven 的目录
-            return "kMDItemDisplayName == \"mvn\"wc || kMDItemDisplayName == \"apache-maven*\"wc"
-
         case .npm:
             // 搜索 npm 可执行文件
             return "kMDItemDisplayName == \"npm\"wc"
-
-        case .homebrew:
-            // 搜索 brew 可执行文件
-            return "kMDItemDisplayName == \"brew\"wc"
-
-        case .orbstack:
-            // OrbStack 是 .app，搜索应用包
-            return "kMDItemKind == \"Application\" && kMDItemDisplayName == \"OrbStack\"wc"
         }
     }
 
     /// 获取可能的可执行文件名称
     nonisolated private func getPossibleExecutableNames(for tool: ToolType) -> [String] {
         switch tool {
-        case .maven:
-            return ["mvn", "apache-maven-*/bin/mvn"]
-
         case .npm:
             return ["npm"]
-
-        case .homebrew:
-            return ["brew"]
-
-        case .orbstack:
-            return ["orb", "orbctl"]
         }
     }
 

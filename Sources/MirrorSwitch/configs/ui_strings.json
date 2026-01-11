@@ -28,26 +28,6 @@
       "npm": {
         "name": "NPM",
         "description": "Node Package Manager"
-      },
-      "maven": {
-        "name": "Maven",
-        "description": "Apache Maven"
-      },
-      "homebrew": {
-        "name": "Homebrew",
-        "description": "The Missing Package Manager for macOS"
-      },
-      "orbstack": {
-        "name": "OrbStack",
-        "description": "Docker Desktop alternative"
-      },
-      "pip": {
-        "name": "PIP",
-        "description": "Python Package Manager"
-      },
-      "gradle": {
-        "name": "Gradle",
-        "description": "Apache Gradle"
       }
     },
     "errors": {

@@ -634,7 +634,7 @@ class MenuUpdateHelper: NSObject {
                     self.updatePrimaryMenuItem(for: tool)
 
                     // 如果是 OrbStack，显示重启提示对话框
-                    if tool == .orbstack {
+                    if tool.rawValue == "orbstack" {
                         // 关闭当前打开的菜单（内部会处理恢复和刷新）
                         self.closeMenu()
                         // 延迟显示弹窗，确保菜单已完全关闭
@@ -798,7 +798,9 @@ class MenuUpdateHelper: NSObject {
                         debugLog("✅ OrbStack 镜像源已重新检测")
                         self.showRestartSuccessAlert()
                         // 更新 UI 显示
-                        self.updateSourceList(for: .orbstack)
+                        if let orbstackTool = ToolType(rawValue: "orbstack") {
+                            self.updateSourceList(for: orbstackTool)
+                        }
                         // 刷新整个菜单
                         self.refreshMenu()
                     }
@@ -986,7 +988,7 @@ class MenuUpdateHelper: NSObject {
                 }
 
                 // 如果是 OrbStack，需要重启 Docker 引擎使配置生效
-                if tool == .orbstack {
+                if tool.rawValue == "orbstack" {
                     await MainActor.run {
                         // 关闭当前打开的菜单（内部会处理恢复和刷新）
                         self.closeMenu()
