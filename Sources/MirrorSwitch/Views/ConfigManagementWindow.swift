@@ -8,6 +8,7 @@
 
 import AppKit
 import Foundation
+import UniformTypeIdentifiers
 
 /// 配置管理窗口
 @MainActor
@@ -38,6 +39,21 @@ class ConfigManagementWindow: NSWindowController {
     /// 名称输入框
     private var nameTextField: NSTextField!
 
+    /// 浏览按钮
+    private var browseButton: NSButton!
+
+    /// 工具可见性容器视图
+    private var toolVisibilityContainer: NSView!
+
+    /// 工具可见性表格视图
+    private var toolVisibilityTableView: NSTableView!
+
+    /// 工具列表（从配置源加载）
+    private var toolsList: [ToolConfiguration] = []
+
+    /// 当前选中的配置源
+    private var selectedConfigSource: ConfigSource?
+
     // MARK: - 初始化
 
     init() {
@@ -53,7 +69,7 @@ class ConfigManagementWindow: NSWindowController {
     // MARK: - 窗口设置
 
     private func setupWindow() {
-        let contentRect = NSRect(x: 0, y: 0, width: 600, height: 450)
+        let contentRect = NSRect(x: 0, y: 0, width: 600, height: 700)
 
         let configWindow = NSWindow(
             contentRect: contentRect,
@@ -190,11 +206,65 @@ class ConfigManagementWindow: NSWindowController {
         urlTextField.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(urlTextField)
 
-        // 保存按钮
-        let saveButton = NSButton(title: "保存配置", target: self, action: #selector(saveButtonClicked))
-        saveButton.bezelStyle = .rounded
-        saveButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(saveButton)
+        // 浏览按钮
+        browseButton = NSButton(title: "浏览...", target: self, action: #selector(browseButtonClicked))
+        browseButton.bezelStyle = .rounded
+        browseButton.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(browseButton)
+
+        // 添加配置按钮（表单中的添加按钮）
+        let addConfigButton = NSButton(title: "+ 添加配置", target: self, action: #selector(saveButtonClicked))
+        addConfigButton.bezelStyle = .rounded
+        addConfigButton.keyEquivalent = "\r"  // 支持 Enter 键
+        addConfigButton.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(addConfigButton)
+
+        // 工具可见性分隔线
+        let toolVisibilitySeparator = NSBox()
+        toolVisibilitySeparator.boxType = .separator
+        toolVisibilitySeparator.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(toolVisibilitySeparator)
+
+        // 工具可见性标题
+        let toolVisibilityLabel = NSTextField(labelWithString: "工具可见性配置")
+        toolVisibilityLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        toolVisibilityLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(toolVisibilityLabel)
+
+        // 工具可见性说明
+        let toolVisibilityHint = NSTextField(labelWithString: "选中一个配置源，然后勾选要在一级菜单中显示的工具")
+        toolVisibilityHint.textColor = .secondaryLabelColor
+        toolVisibilityHint.font = NSFont.systemFont(ofSize: 11)
+        toolVisibilityHint.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(toolVisibilityHint)
+
+        // 工具可见性滚动视图
+        let toolVisibilityScrollView = NSScrollView()
+        toolVisibilityScrollView.hasVerticalScroller = true
+        toolVisibilityScrollView.hasHorizontalScroller = false
+        toolVisibilityScrollView.autohidesScrollers = true
+        toolVisibilityScrollView.borderType = .bezelBorder
+        toolVisibilityScrollView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(toolVisibilityScrollView)
+
+        // 工具可见性表格视图
+        toolVisibilityTableView = NSTableView()
+        toolVisibilityTableView.delegate = self
+        toolVisibilityTableView.dataSource = self
+        toolVisibilityTableView.usesAlternatingRowBackgroundColors = true
+        toolVisibilityScrollView.documentView = toolVisibilityTableView
+
+        // 列：可见性复选框
+        let toolVisibleColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("toolVisible"))
+        toolVisibleColumn.headerCell.stringValue = "显示"
+        toolVisibleColumn.width = 50
+        toolVisibilityTableView.addTableColumn(toolVisibleColumn)
+
+        // 列：工具名称
+        let toolNameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("toolName"))
+        toolNameColumn.headerCell.stringValue = "工具名称"
+        toolNameColumn.width = 200
+        toolVisibilityTableView.addTableColumn(toolNameColumn)
 
         // 布局约束
         NSLayoutConstraint.activate([
@@ -257,12 +327,39 @@ class ConfigManagementWindow: NSWindowController {
             // URL 输入框
             urlTextField.topAnchor.constraint(equalTo: nameTextField.bottomAnchor, constant: 10),
             urlTextField.leadingAnchor.constraint(equalTo: urlLabel.trailingAnchor, constant: 10),
-            urlTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -100),
+            urlTextField.trailingAnchor.constraint(equalTo: browseButton.leadingAnchor, constant: -10),
             urlTextField.heightAnchor.constraint(equalToConstant: 24),
 
-            // 保存按钮
-            saveButton.topAnchor.constraint(equalTo: urlTextField.bottomAnchor, constant: 15),
-            saveButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            // 浏览按钮
+            browseButton.centerYAnchor.constraint(equalTo: urlTextField.centerYAnchor),
+            browseButton.trailingAnchor.constraint(equalTo: addConfigButton.leadingAnchor, constant: -10),
+            browseButton.widthAnchor.constraint(equalToConstant: 80),
+
+            // 添加配置按钮（与浏览按钮在同一行）
+            addConfigButton.centerYAnchor.constraint(equalTo: urlTextField.centerYAnchor),
+            addConfigButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            addConfigButton.widthAnchor.constraint(equalToConstant: 100),
+
+            // 工具可见性分隔线
+            toolVisibilitySeparator.topAnchor.constraint(equalTo: addConfigButton.bottomAnchor, constant: 20),
+            toolVisibilitySeparator.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            toolVisibilitySeparator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
+            // 工具可见性标题
+            toolVisibilityLabel.topAnchor.constraint(equalTo: toolVisibilitySeparator.bottomAnchor, constant: 15),
+            toolVisibilityLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+
+            // 工具可见性说明
+            toolVisibilityHint.topAnchor.constraint(equalTo: toolVisibilityLabel.bottomAnchor, constant: 5),
+            toolVisibilityHint.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            toolVisibilityHint.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
+            // 工具可见性滚动视图
+            toolVisibilityScrollView.topAnchor.constraint(equalTo: toolVisibilityHint.bottomAnchor, constant: 10),
+            toolVisibilityScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            toolVisibilityScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            toolVisibilityScrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+            toolVisibilityScrollView.heightAnchor.constraint(equalToConstant: 150),
         ])
     }
 
@@ -271,14 +368,40 @@ class ConfigManagementWindow: NSWindowController {
     private func loadData() {
         configSources = ConfigSourceManager.shared.getAllSources()
         tableView.reloadData()
+
+        // 加载工具列表
+        loadToolsList()
+    }
+
+    /// 加载工具列表（从 ConfigurationDrivenSourceManager）
+    private func loadToolsList() {
+        toolsList = ConfigurationDrivenSourceManager.shared.getAllTools()
+    }
+
+    /// 选中配置源时更新工具可见性表格
+    private func updateToolVisibilityTable() {
+        // 重新加载工具列表（确保显示最新的工具）
+        loadToolsList()
+
+        // 重新加载表格数据
+        toolVisibilityTableView.reloadData()
+
+        // 更新说明文本
+        if let source = selectedConfigSource {
+            // 查找说明文本字段
+            if let hintView = self.window?.contentView?.subviews.first(where: { ($0 as? NSTextField)?.stringValue.contains("选中一个配置源") ?? false }) as? NSTextField {
+                hintView.stringValue = "配置源「\(source.name)」包含以下工具，勾选要在一级菜单中显示的工具"
+            }
+        }
     }
 
     // MARK: - 按钮操作
 
     @objc private func addButtonClicked() {
-        // 清空输入框
+        // 清空输入框并聚焦到名称输入框
         nameTextField.stringValue = ""
         urlTextField.stringValue = ""
+        nameTextField.becomeFirstResponder()
     }
 
     @objc private func removeButtonClicked() {
@@ -322,6 +445,31 @@ class ConfigManagementWindow: NSWindowController {
             : "https://example.com/maven_mirror.json"
     }
 
+    @objc private func browseButtonClicked() {
+        let panel = NSOpenPanel()
+        panel.title = "选择配置文件"
+        panel.prompt = "选择"
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+
+        panel.beginSheetModal(for: self.window!) { response in
+            if response == .OK, let url = panel.url {
+                // 如果是用户目录下的文件，使用 ~ 简化显示
+                let homeDir = FileManager.default.homeDirectoryForCurrentUser
+                let path = url.path
+
+                if path.hasPrefix(homeDir.path) {
+                    let relativePath = "~" + String(path.dropFirst(homeDir.path.count))
+                    self.urlTextField.stringValue = relativePath
+                } else {
+                    self.urlTextField.stringValue = path
+                }
+            }
+        }
+    }
+
     @objc private func saveButtonClicked() {
         let name = nameTextField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let url = urlTextField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -346,12 +494,26 @@ class ConfigManagementWindow: NSWindowController {
                 showAlert(message: "文件不存在: \(expandedPath)")
                 return
             }
+
+            // Schema 验证
+            let fileURL = URL(fileURLWithPath: expandedPath)
+            let validationResult = SchemaValidator.shared.validate(fileURL: fileURL)
+
+            guard validationResult.isValid else {
+                showAlert(message: "配置文件格式不正确:\n\(validationResult.errorMessage ?? "未知错误")")
+                return
+            }
+
+            print("✅ 配置文件 Schema 验证通过")
+
         } else {
             // 远程 URL
             guard URL(string: url) != nil else {
                 showAlert(message: "无效的 URL 格式")
                 return
             }
+
+            // 远程配置在加载时验证（ConfigurationLoader 中已有 validateConfiguration 方法）
         }
 
         // 创建配置源
@@ -372,7 +534,7 @@ class ConfigManagementWindow: NSWindowController {
         nameTextField.stringValue = ""
         urlTextField.stringValue = ""
 
-        showAlert(message: "配置源已添加", style: .informational)
+        showAlert(message: "配置源已添加，工具列表将自动刷新", style: .informational)
     }
 
     // MARK: - 辅助方法
@@ -399,6 +561,9 @@ class ConfigManagementWindow: NSWindowController {
 
 extension ConfigManagementWindow: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int {
+        if tableView == toolVisibilityTableView {
+            return selectedConfigSource != nil ? toolsList.count : 0
+        }
         return configSources.count
     }
 }
@@ -407,6 +572,42 @@ extension ConfigManagementWindow: NSTableViewDataSource {
 
 extension ConfigManagementWindow: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        // 处理工具可见性表格
+        if tableView == toolVisibilityTableView {
+            guard selectedConfigSource != nil, row < toolsList.count else { return nil }
+
+            let tool = toolsList[row]
+            let columnId = tableColumn?.identifier.rawValue ?? ""
+
+            switch columnId {
+            case "toolVisible":
+                let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(toolVisibilityCheckboxClicked(_:)))
+                // 获取当前配置源中此工具的可见性
+                let isVisible = ConfigSourceManager.shared.getToolVisibility(
+                    configSourceId: selectedConfigSource!.id,
+                    toolId: tool.id
+                )
+                checkbox.state = isVisible ? .on : .off
+                checkbox.identifier = NSUserInterfaceItemIdentifier(tool.id)
+                return checkbox
+
+            case "toolName":
+                let cellView = NSTableCellView()
+                let textField = NSTextField(labelWithString: "\(tool.name) (\(tool.id))")
+                cellView.addSubview(textField)
+                textField.translatesAutoresizingMaskIntoConstraints = false
+                NSLayoutConstraint.activate([
+                    textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                    textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5)
+                ])
+                return cellView
+
+            default:
+                return nil
+            }
+        }
+
+        // 处理配置源表格（原有逻辑）
         guard row < configSources.count else { return nil }
 
         let source = configSources[row]
@@ -417,10 +618,7 @@ extension ConfigManagementWindow: NSTableViewDelegate {
             let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(enabledCheckboxClicked(_:)))
             checkbox.state = source.isEnabled ? .on : .off
             checkbox.identifier = NSUserInterfaceItemIdentifier(source.id.uuidString)
-            // 内置配置不允许禁用
-            if source.type == .builtin {
-                checkbox.isEnabled = false
-            }
+            // 内置配置可以启用/禁用
             return checkbox
 
         case "type":
@@ -483,5 +681,32 @@ extension ConfigManagementWindow: NSTableViewDelegate {
 
         ConfigSourceManager.shared.toggleConfigSource(id: uuid)
         loadData()
+    }
+
+    /// 配置源选中事件
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        let selectedRow = tableView.selectedRow
+        if selectedRow >= 0 && selectedRow < configSources.count {
+            selectedConfigSource = configSources[selectedRow]
+            updateToolVisibilityTable()
+        } else {
+            selectedConfigSource = nil
+            toolVisibilityTableView.reloadData()
+        }
+    }
+
+    /// 工具可见性复选框点击事件
+    @objc private func toolVisibilityCheckboxClicked(_ sender: NSButton) {
+        guard let toolId = sender.identifier?.rawValue,
+              let source = selectedConfigSource else {
+            return
+        }
+
+        let isVisible = sender.state == .on
+        ConfigSourceManager.shared.setToolVisibility(
+            configSourceId: source.id,
+            toolId: toolId,
+            isVisible: isVisible
+        )
     }
 }
