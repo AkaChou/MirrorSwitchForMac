@@ -34,6 +34,9 @@ struct ConfigSource: Identifiable, Codable, Equatable {
     /// 创建时间
     let createdAt: Date
 
+    /// 工具可见性设置（工具ID -> 是否可见）
+    var toolVisibility: [String: Bool]?
+
     /// 初始化方法（非 builtin 类型使用）
     init(
         id: UUID = UUID(),
@@ -55,13 +58,13 @@ struct ConfigSource: Identifiable, Codable, Equatable {
     }
 
     /// 创建内置配置源
-    static func builtin(name: String) -> ConfigSource {
+    static func builtin(name: String, isEnabled: Bool = true) -> ConfigSource {
         return ConfigSource(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, // 固定 UUID
             name: name,
             type: .builtin,
             url: nil,
-            isEnabled: true,
+            isEnabled: isEnabled,
             lastUpdated: nil,
             status: .valid
         )

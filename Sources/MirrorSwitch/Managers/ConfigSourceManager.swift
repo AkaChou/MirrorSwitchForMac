@@ -74,6 +74,9 @@ class ConfigSourceManager {
         configSources.append(source)
         saveConfigSources()
         print("✅ 已添加配置源: \(source.name)")
+
+        // 发送通知
+        NotificationCenter.default.post(name: .configSourcesDidChange, object: nil)
     }
 
     /// 删除配置源
@@ -88,18 +91,23 @@ class ConfigSourceManager {
         configSources.removeAll { $0.id == id }
         saveConfigSources()
         print("✅ 已删除配置源")
+
+        // 发送通知
+        NotificationCenter.default.post(name: .configSourcesDidChange, object: nil)
     }
 
     /// 切换配置源启用状态
     func toggleConfigSource(id: UUID) {
-        // 内置配置始终启用
-        guard let index = configSources.firstIndex(where: { $0.id == id }),
-              configSources[index].type != .builtin else {
+        guard let index = configSources.firstIndex(where: { $0.id == id }) else {
             return
         }
 
+        // 内置配置允许切换启用状态
         configSources[index].isEnabled.toggle()
         saveConfigSources()
+
+        // 发送通知
+        NotificationCenter.default.post(name: .configSourcesDidChange, object: nil)
     }
 
     /// 更新配置源状态
@@ -232,5 +240,109 @@ class ConfigSourceManager {
             configSources.insert(builtin, at: 0)
             saveConfigSources()
         }
+    }
+
+    // MARK: - 工具可见性管理
+
+    /// 设置配置源的工具可见性
+    /// - Parameters:
+    ///   - configSourceId: 配置源 ID
+    ///   - toolId: 工具 ID
+    ///   - isVisible: 是否可见
+    func setToolVisibility(configSourceId: UUID, toolId: String, isVisible: Bool) {
+        guard let index = configSources.firstIndex(where: { $0.id == configSourceId }) else {
+            print("⚠️ 配置源不存在: \(configSourceId)")
+            return
+        }
+
+        // 初始化 toolVisibility（如果不存在）
+        if configSources[index].toolVisibility == nil {
+            configSources[index].toolVisibility = [:]
+        }
+
+        // 设置可见性
+        configSources[index].toolVisibility?[toolId] = isVisible
+        saveConfigSources()
+
+        print("✅ 已设置工具可见性: \(toolId) -> \(isVisible)")
+
+        // 发送通知
+        NotificationCenter.default.post(name: .configSourcesDidChange, object: nil)
+    }
+
+    /// 获取配置源的工具可见性设置
+    /// - Parameter configSourceId: 配置源 ID
+    /// - Returns: 工具可见性字典（toolId -> isVisible）
+    func getToolVisibility(configSourceId: UUID) -> [String: Bool]? {
+        guard let source = configSources.first(where: { $0.id == configSourceId }) else {
+            return nil
+        }
+        return source.toolVisibility
+    }
+
+    /// 获取配置源中指定工具的可见性
+    /// - Parameters:
+    ///   - configSourceId: 配置源 ID
+    ///   - toolId: 工具 ID
+    /// - Returns: 是否可见（默认为可见）
+    func getToolVisibility(configSourceId: UUID, toolId: String) -> Bool {
+        guard let visibility = getToolVisibility(configSourceId: configSourceId) else {
+            return true  // 默认可见
+        }
+        return visibility[toolId] ?? true  // 默认可见
+    }
+
+    /// 批量设置配置源的工具可见性
+    /// - Parameters:
+    ///   - configSourceId: 配置源 ID
+    ///   - visibility: 工具可见性字典（toolId -> isVisible）
+    func setToolVisibility(configSourceId: UUID, visibility: [String: Bool]) {
+        guard let index = configSources.firstIndex(where: { $0.id == configSourceId }) else {
+            print("⚠️ 配置源不存在: \(configSourceId)")
+            return
+        }
+
+        configSources[index].toolVisibility = visibility
+        saveConfigSources()
+
+        print("✅ 已批量设置工具可见性")
+
+        // 发送通知
+        NotificationCenter.default.post(name: .configSourcesDidChange, object: nil)
+    }
+
+    /// 检查工具是否应该在一级菜单中显示
+    /// - Parameter toolId: 工具 ID
+    /// - Returns: 是否应该显示（至少有一个配置源允许显示）
+    func isToolVisibleInMenu(toolId: String) -> Bool {
+        var hasExplicitConfig = false  // 是否有配置源明确配置了该工具的可见性
+
+        // 检查所有启用的配置源
+        for source in getEnabledSources() {
+            // 获取该配置源的工具可见性设置
+            guard let visibility = getToolVisibility(configSourceId: source.id) else {
+                continue  // 该配置源没有设置过任何工具可见性，跳过
+            }
+
+            // 该配置源有设置过工具可见性
+            hasExplicitConfig = true
+
+            // 检查是否明确配置了该工具
+            if let toolVisible = visibility[toolId] {
+                if toolVisible {
+                    return true  // 该工具明确设置为可见
+                }
+                // 如果设置为 false，继续检查其他配置源
+            }
+        }
+
+        // 如果没有任何配置源明确配置过工具可见性，则默认可见
+        // 这样新添加的工具默认会显示
+        if !hasExplicitConfig {
+            return true
+        }
+
+        // 所有明确配置过的配置源都将该工具设为不可见
+        return false
     }
 }
