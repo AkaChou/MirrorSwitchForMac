@@ -1,0 +1,66 @@
+{
+  "$schema": "./app_config.schema.json",
+  "version": "1.0.0",
+  "app": {
+    "name": "MirrorSwitch",
+    "displayName": "镜像源切换器",
+    "identifier": "com.example.mirrorswitch",
+    "version": "1.0.0"
+  },
+  "ui": {
+    "menuBar": {
+      "icon": {
+        "systemSymbolName": "arrow.triangle.2.circlepath",
+        "template": true
+      },
+      "title": "镜像源切换"
+    },
+    "speedTest": {
+      "enabled": true,
+      "autoRunOnLaunch": true,
+      "timeout": 5,
+      "retryCount": 2
+    },
+    "items": {
+      "defaultSourceName": "未选择",
+      "testingText": "测速中...",
+      "testButtonText": "测速",
+      "resetButtonText": "重置",
+      "quitButtonText": "退出"
+    }
+  },
+  "behavior": {
+    "autoDetectTools": true,
+    "autoBackupBeforeSwitch": true,
+    "confirmBeforeReset": true,
+    "closeMenuAfterSwitch": false,
+    "restartDockerAfterOrbStackSwitch": true
+  },
+  "network": {
+    "userAgent": "MirrorSwitch/1.0",
+    "timeout": 10,
+    "maxRetries": 3
+  },
+  "paths": {
+    "configDirectory": "~/.mirror-switch",
+    "cacheDirectory": "~/.mirror-switch/cache",
+    "backupDirectory": "~/.mirror-switch/backup",
+    "logDirectory": "~/.mirror-switch/logs"
+  },
+  "remoteConfig": {
+    "enabled": false,
+    "url": "",
+    "updateInterval": 86400,
+    "fallbackToLocal": true,
+    "validateSchema": true
+  },
+  "features": {
+    "speedTest": true,
+    "autoSelectFastest": false,
+    "notifications": {
+      "enabled": false,
+      "onSwitchSuccess": false,
+      "onSwitchFailure": true
+    }
+  }
+}

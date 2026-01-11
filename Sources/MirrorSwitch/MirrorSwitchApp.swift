@@ -98,6 +98,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 检测工具、初始化 SourceManager 和创建菜单
         Task {
+            // 0. 加载应用配置
+            debugLog("⚙️ 开始加载应用配置...")
+            do {
+                try await AppConfigManager.shared.loadConfig()
+                debugLog("✅ 应用配置加载完成")
+            } catch {
+                debugLog("⚠️ 应用配置加载失败: \(error.localizedDescription)")
+            }
+
             // 1. 检测已安装的工具并获取版本
             debugLog("🔍 开始检测已安装的工具...")
             var toolVersions: [ToolType: String] = [:]
@@ -113,23 +122,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             debugLog("✅ 检测完成，发现 \(toolVersions.count) 个工具")
 
-            // 2. 为检测到的工具备份原始配置（首次检测时）
-            for tool in toolVersions.keys {
-                if tool == .maven {
-                    debugLog("💾 备份 Maven 原始配置...")
-                    let mavenHandler = MavenHandler()
-                    try? await mavenHandler.backupOriginalSettings()
-                } else if tool == .orbstack {
-                    debugLog("💾 备份 OrbStack 原始配置...")
-                    let orbStackHandler = OrbStackHandler()
-                    try? await orbStackHandler.backupOriginalConfig()
-                }
-            }
-
-            // 3. 初始化 SourceManager
-            await SourceManager.shared.initialize()
-
-            // 4. 创建菜单
+            // 2. 初始化配置驱动管理器（包含备份机制）
+            await ConfigurationDrivenSourceManager.shared.initialize()
             await MainActor.run {
                 setupStatusBarMenu(with: toolVersions)
             }
@@ -158,8 +152,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            if let image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath",
-                                   accessibilityDescription: "Mirror Switch") {
+            // 从配置获取菜单图标
+            let iconConfig = AppConfigManager.shared.menuBarIcon
+            if let image = NSImage(systemSymbolName: iconConfig.systemSymbolName,
+                                   accessibilityDescription: AppConfigManager.shared.appDisplayName) {
                 button.image = image
             } else {
                 button.title = "⚡️"
@@ -237,7 +233,7 @@ class MenuUpdateHelper: NSObject {
         // 为每个工具创建子菜单（包含版本信息和当前源）
         for tool in ToolType.allCases {
             // 获取当前选中的源
-            let sources = SourceManager.shared.getSources(for: tool)
+            let sources = ConfigurationDrivenSourceManager.shared.getSources(for: tool)
             let currentSource = sources.first(where: { $0.isSelected })
             if let currentSource = currentSource {
                 toolCurrentSources[tool] = currentSource
@@ -323,7 +319,7 @@ class MenuUpdateHelper: NSObject {
         menu.addItem(NSMenuItem.separator())
 
         // 镜像源列表 - 紧跟在测速按钮后面
-        let sources = SourceManager.shared.getSources(for: tool)
+        let sources = ConfigurationDrivenSourceManager.shared.getSources(for: tool)
         var views: [MirrorSourceItemView] = []
 
         for source in sources {
@@ -427,7 +423,7 @@ class MenuUpdateHelper: NSObject {
         // 为每个工具创建子菜单（包含版本信息和当前源）
         for tool in ToolType.allCases {
             // 获取当前选中的源
-            let sources = SourceManager.shared.getSources(for: tool)
+            let sources = ConfigurationDrivenSourceManager.shared.getSources(for: tool)
             let currentSource = sources.first(where: { $0.isSelected })
             if let currentSource = currentSource {
                 toolCurrentSources[tool] = currentSource
@@ -491,8 +487,8 @@ class MenuUpdateHelper: NSObject {
         // 在后台执行测速
         Task {
             debugLog("⚡️ 后台测速任务开始")
-            let sources = SourceManager.shared.getSources(for: tool)
-            await SourceManager.shared.testSpeed(sources: sources)
+            let sources = ConfigurationDrivenSourceManager.shared.getSources(for: tool)
+            await ConfigurationDrivenSourceManager.shared.testSpeed(sources: sources)
             debugLog("⚡️ 后台测速任务完成")
 
             await MainActor.run {
@@ -549,7 +545,7 @@ class MenuUpdateHelper: NSObject {
         debugLog("🔄 更新 \(tool.displayName) 的镜像源列表，共 \(views.count) 个 view")
 
         // 获取最新的镜像源数据
-        let sources = SourceManager.shared.getSources(for: tool)
+        let sources = ConfigurationDrivenSourceManager.shared.getSources(for: tool)
 
         // 更新每个 view 的数据
         for (index, view) in views.enumerated() {
@@ -576,7 +572,9 @@ class MenuUpdateHelper: NSObject {
 
         // 从 toolCurrentSources 获取当前选中的源
         guard let currentSource = toolCurrentSources[tool] else {
-            debugLog("⚠️ tool=\(tool.displayName) 没有选中的源")
+            // 没有选中的源，显示"未选择"
+            menuItemView.updateSourceName("")
+            debugLog("✅ 一级菜单已更新: \(tool.displayName) -> 未选择")
             return
         }
 
@@ -595,7 +593,7 @@ class MenuUpdateHelper: NSObject {
 
         Task {
             do {
-                try await SourceManager.shared.switchSource(tool: tool, source: source)
+                try await ConfigurationDrivenSourceManager.shared.switchSource(tool: tool, source: source)
                 await MainActor.run {
                     self.refreshMenu()
                 }
@@ -624,7 +622,7 @@ class MenuUpdateHelper: NSObject {
 
         Task {
             do {
-                try await SourceManager.shared.switchSource(tool: tool, source: source)
+                try await ConfigurationDrivenSourceManager.shared.switchSource(tool: tool, source: source)
                 await MainActor.run {
                     // 更新 toolCurrentSources 字典
                     self.toolCurrentSources[tool] = source
@@ -794,7 +792,7 @@ class MenuUpdateHelper: NSObject {
                     debugLog("✅ OrbStack Docker 引擎已重启")
 
                     // 重启后重新检测当前镜像源
-                    await SourceManager.shared.initialize()
+                    await ConfigurationDrivenSourceManager.shared.initialize()
 
                     await MainActor.run {
                         debugLog("✅ OrbStack 镜像源已重新检测")
@@ -843,20 +841,6 @@ class MenuUpdateHelper: NSObject {
 
             // 尝试从自定义路径检测工具
             let detected = await detectToolWithCustomPath(tool: tool, path: path)
-
-            // 如果是 Maven，备份原始配置
-            if tool == .maven {
-                debugLog("💾 备份 Maven 原始配置...")
-                let mavenHandler = MavenHandler()
-                try? await mavenHandler.backupOriginalSettings()
-            }
-
-            // 如果是 OrbStack，备份原始配置
-            if tool == .orbstack {
-                debugLog("💾 备份 OrbStack 原始配置...")
-                let orbStackHandler = OrbStackHandler()
-                try? await orbStackHandler.backupOriginalConfig()
-            }
 
             await MainActor.run {
                 if let version = detected {
@@ -935,27 +919,13 @@ class MenuUpdateHelper: NSObject {
     func openConfigDirectory(for tool: ToolType) {
         debugLog("📂 打开 \(tool.displayName) 配置文件目录")
 
-        // 获取对应的 handler
-        let handler: ToolHandlerProtocol?
-        switch tool {
-        case .npm:
-            handler = NPMHandler()
-        case .maven:
-            handler = MavenHandler()
-        case .homebrew:
-            handler = HomebrewHandler()
-        case .orbstack:
-            handler = OrbStackHandler()
-        }
+        // 从工具类型获取配置文件目录
+        let configDirString = tool.configDirectory
+        let configDir = URL(fileURLWithPath: (configDirString as NSString).expandingTildeInPath)
 
-        guard let handler = handler else {
-            debugLog("❌ 无法找到 \(tool.displayName) 的处理器")
-            return
-        }
-
-        // 获取配置文件目录
-        guard let configDir = handler.getConfigDirectory() else {
-            debugLog("❌ 无法获取 \(tool.displayName) 配置文件目录")
+        // 检查目录是否存在
+        if !FileManager.default.fileExists(atPath: configDir.path) {
+            debugLog("❌ 配置文件目录不存在: \(configDir.path)")
             showConfigDirNotFoundAlert(for: tool)
             return
         }
@@ -987,11 +957,31 @@ class MenuUpdateHelper: NSObject {
 
         Task {
             do {
-                try await SourceManager.shared.restoreBackup(for: tool)
+                try await ConfigurationDrivenSourceManager.shared.restoreConfig(for: tool)
+
+                // 重新检测当前使用的镜像源
+                await ConfigurationDrivenSourceManager.shared.detectCurrentSource(for: tool.rawValue)
+
+                // 同步更新 toolCurrentSources（从 ConfigurationDrivenSourceManager 获取最新状态）
+                let sourceId = ConfigurationDrivenSourceManager.shared.getCurrentSelection(toolId: tool.rawValue)
+                let sources = ConfigurationDrivenSourceManager.shared.getSources(for: tool)
+
+                if let sourceId = sourceId,
+                   let currentSource = sources.first(where: { $0.id == sourceId }) {
+                    // 有匹配的镜像源
+                    toolCurrentSources[tool] = currentSource
+                } else {
+                    // 没有匹配的镜像源，清除缓存
+                    toolCurrentSources.removeValue(forKey: tool)
+                }
 
                 await MainActor.run {
                     // 直接更新镜像源列表的对勾状态
                     self.updateSourceList(for: tool)
+
+                    // 更新一级菜单的显示
+                    self.updatePrimaryMenuItem(for: tool)
+
                     debugLog("✅ \(tool.displayName) 已重置为默认配置")
                 }
 
@@ -1004,11 +994,6 @@ class MenuUpdateHelper: NSObject {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                             self.showOrbStackRestartAlertAfterReset()
                         }
-                    }
-                } else {
-                    // 其他工具直接刷新菜单
-                    await MainActor.run {
-                        self.refreshMenu()
                     }
                 }
             } catch {

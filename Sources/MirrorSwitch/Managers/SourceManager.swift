@@ -2,12 +2,14 @@
 //  SourceManager.swift
 //  MirrorSwitch
 //
-//  核心管理器，协调镜像源切换、配置管理和网络测速
+//  核心管理器（已废弃，请使用 ConfigurationDrivenSourceManager）
+//  此文件保留仅用于向后兼容，实际功能已迁移到 ConfigurationDrivenSourceManager
 //
 
 import Foundation
 
 /// 核心管理器（单例）
+/// 此类已被 ConfigurationDrivenSourceManager 替代
 @MainActor
 class SourceManager {
     /// 单例实例
@@ -19,24 +21,15 @@ class SourceManager {
     /// 网络测速器
     private let networkTester = NetworkTester()
 
-    /// 应用配置
-    private var config: AppConfiguration
-
-    /// 各工具的处理器
-    private var handlers: [ToolType: ToolHandlerProtocol]
+    /// 镜像源配置
+    private var config: MirrorSourceConfiguration
 
     /// 是否已初始化
     private var isInitialized = false
 
     /// 私有初始化方法
     private init() {
-        self.config = AppConfiguration.defaultConfig
-        self.handlers = [
-            .npm: NPMHandler(),
-            .maven: MavenHandler(),
-            .homebrew: HomebrewHandler(),
-            .orbstack: OrbStackHandler()
-        ]
+        self.config = MirrorSourceConfiguration.defaultConfig
     }
 
     // MARK: - Public Methods
@@ -47,9 +40,6 @@ class SourceManager {
 
         // 加载配置
         config = configManager.loadConfig()
-
-        // 先尝试加载保存的选中状态
-        loadCurrentSelection()
 
         // 检测当前实际使用的镜像源并设置选中状态
         await detectCurrentSources()
@@ -65,38 +55,22 @@ class SourceManager {
 
     /// 切换到指定镜像源
     func switchSource(tool: ToolType, source: MirrorSource) async throws {
-        guard let handler = handlers[tool] else {
-            throw SourceManagerError.handlerNotFound
-        }
-
-        print("🔄 开始切换 \(tool.displayName) 镜像源...")
-
-        // 执行切换
-        try await handler.switchTo(source)
-
-        // 保存选择
-        configManager.saveCurrentSelection(tool: tool, sourceId: source.id)
-
-        // 更新内存中的选中状态
-        updateSelectionState(tool: tool, sourceId: source.id)
-
-        print("✓ \(tool.displayName) 镜像源切换完成")
+        print("⚠️ 使用已废弃的 SourceManager，请使用 ConfigurationDrivenSourceManager")
+        throw SourceManagerError.switchFailed("请使用 ConfigurationDrivenSourceManager")
     }
 
     /// 测试指定工具的所有镜像源延迟
     func testSpeed(sources: [MirrorSource]) async {
         print("⚡️ 开始测速，共 \(sources.count) 个镜像源...")
 
-        let tester = networkTester
         await withTaskGroup(of: (String, Int?).self) { group in
             for source in sources {
                 group.addTask {
-                    await tester.testSource(source)
+                    await self.networkTester.testSource(source)
                 }
             }
 
             for await (sourceId, pingTime) in group {
-                // 更新延迟时间到配置中
                 updatePingTime(sourceId: sourceId, pingTime: pingTime)
             }
         }
@@ -106,116 +80,21 @@ class SourceManager {
 
     /// 获取指定工具的当前配置
     func getCurrentConfig(for tool: ToolType) async throws -> String {
-        guard let handler = handlers[tool] else {
-            throw SourceManagerError.handlerNotFound
-        }
-
-        return try await handler.getCurrentConfig()
+        print("⚠️ 使用已废弃的 SourceManager，请使用 ConfigurationDrivenSourceManager")
+        throw SourceManagerError.switchFailed("请使用 ConfigurationDrivenSourceManager")
     }
 
     /// 恢复指定工具的备份配置
-    func restoreBackup(for tool: ToolType) async throws {
-        guard let handler = handlers[tool] else {
-            throw SourceManagerError.handlerNotFound
-        }
-
-        try await handler.restoreBackup()
-
-        // 恢复后重新检测当前使用的镜像源
-        await detectCurrentSource(for: tool)
+    func restoreConfig(for tool: ToolType) async throws {
+        print("⚠️ 使用已废弃的 SourceManager，请使用 ConfigurationDrivenSourceManager")
+        throw SourceManagerError.switchFailed("请使用 ConfigurationDrivenSourceManager")
     }
 
     // MARK: - Private Methods
 
-    /// 检测指定工具当前实际使用的镜像源
-    private func detectCurrentSource(for tool: ToolType) async {
-        do {
-            let currentConfig = try await getCurrentConfig(for: tool)
-
-            // 查找匹配的镜像源
-            if let matchingSource = findMatchingSource(for: tool, currentConfig: currentConfig) {
-                // 更新选中状态
-                updateSelectionState(tool: tool, sourceId: matchingSource.id)
-
-                // 保存选中状态到文件
-                configManager.saveCurrentSelection(tool: tool, sourceId: matchingSource.id)
-
-                print("✓ 检测到 \(tool.displayName) 当前使用: \(matchingSource.name)")
-            } else {
-                // 没有找到匹配的镜像源，清除所有选中状态
-                clearSelectionState(tool: tool)
-                // 清除保存的选中状态
-                configManager.clearCurrentSelection(tool: tool)
-                print("✓ \(tool.displayName) 未配置或无法识别当前配置")
-            }
-        } catch {
-            print("⚠️ 无法检测 \(tool.displayName) 当前配置: \(error.localizedDescription)")
-        }
-    }
-
-    /// 加载当前选中状态
-    private func loadCurrentSelection() {
-        for tool in ToolType.allCases {
-            if let sourceId = configManager.getCurrentSelection(for: tool) {
-                updateSelectionState(tool: tool, sourceId: sourceId)
-            }
-        }
-    }
-
     /// 检测当前实际使用的镜像源
     private func detectCurrentSources() async {
-        for tool in ToolType.allCases {
-            await detectCurrentSource(for: tool)
-        }
-    }
-
-    /// 根据当前配置查找匹配的镜像源
-    private func findMatchingSource(for tool: ToolType, currentConfig: String) -> MirrorSource? {
-        let sources = getSources(for: tool)
-
-        // 优先精确 URL 匹配
-        for source in sources {
-            if currentConfig.contains(source.url) {
-                return source
-            }
-        }
-
-        // 如果没有精确匹配，尝试域名匹配
-        for source in sources {
-            if let sourceDomain = extractDomain(from: source.url),
-               let currentDomain = extractDomain(from: currentConfig),
-               sourceDomain == currentDomain {
-                return source
-            }
-        }
-
-        return nil
-    }
-
-    /// 从 URL 中提取域名
-    private func extractDomain(from url: String) -> String? {
-        guard let url = URL(string: url) else { return nil }
-        return url.host
-    }
-
-    /// 更新选中状态
-    private func updateSelectionState(tool: ToolType, sourceId: String) {
-        if var sources = config.tools[tool] {
-            for index in sources.indices {
-                sources[index].isSelected = (sources[index].id == sourceId)
-            }
-            config.tools[tool] = sources
-        }
-    }
-
-    /// 清除选中状态
-    private func clearSelectionState(tool: ToolType) {
-        if var sources = config.tools[tool] {
-            for index in sources.indices {
-                sources[index].isSelected = false
-            }
-            config.tools[tool] = sources
-        }
+        // 简化实现：仅用于兼容
     }
 
     /// 更新延迟时间
@@ -236,6 +115,13 @@ enum SourceManagerError: Error {
     case handlerNotFound
     case notInitialized
     case switchFailed(String)
+    case toolNotFound(String)
+    case sourceNotFound(String)
+    case backupNotFound
+    case backupNotSupported
+    case parseFailed(String)
+    case commandExecutionFailed(String)
+    case configNotFound
 
     var localizedDescription: String {
         switch self {
@@ -245,6 +131,20 @@ enum SourceManagerError: Error {
             return "管理器未初始化"
         case .switchFailed(let message):
             return "切换失败: \(message)"
+        case .toolNotFound(let id):
+            return "工具未找到: \(id)"
+        case .sourceNotFound(let id):
+            return "镜像源未找到: \(id)"
+        case .backupNotFound:
+            return "备份文件不存在"
+        case .backupNotSupported:
+            return "该工具不支持备份"
+        case .parseFailed(let message):
+            return "解析失败: \(message)"
+        case .commandExecutionFailed(let message):
+            return "命令执行失败: \(message)"
+        case .configNotFound:
+            return "配置文件不存在"
         }
     }
 }

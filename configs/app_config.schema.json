@@ -1,0 +1,239 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MirrorSwitch Application Configuration",
+  "description": "应用配置文件定义，包含 UI、行为和网络相关配置",
+  "type": "object",
+  "required": ["version", "app", "ui", "behavior", "paths"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "配置文件版本号"
+    },
+    "app": {
+      "type": "object",
+      "description": "应用基本信息",
+      "required": ["name", "displayName", "identifier"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "应用英文名称"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "应用中文名称"
+        },
+        "identifier": {
+          "type": "string",
+          "description": "应用唯一标识符"
+        },
+        "version": {
+          "type": "string",
+          "description": "应用版本号"
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "description": "UI 相关配置",
+      "required": ["menuBar", "speedTest", "items"],
+      "properties": {
+        "menuBar": {
+          "type": "object",
+          "description": "菜单栏配置",
+          "properties": {
+            "icon": {
+              "type": "object",
+              "properties": {
+                "systemSymbolName": {
+                  "type": "string",
+                  "description": "SF Symbols 图标名称"
+                },
+                "template": {
+                  "type": "boolean",
+                  "description": "是否使用模板样式"
+                }
+              }
+            },
+            "title": {
+              "type": "string",
+              "description": "菜单栏标题"
+            }
+          }
+        },
+        "speedTest": {
+          "type": "object",
+          "description": "测速功能配置",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "是否启用测速功能"
+            },
+            "autoRunOnLaunch": {
+              "type": "boolean",
+              "description": "启动时是否自动测速"
+            },
+            "timeout": {
+              "type": "number",
+              "description": "测速超时时间（秒）"
+            },
+            "retryCount": {
+              "type": "number",
+              "description": "重试次数"
+            }
+          }
+        },
+        "items": {
+          "type": "object",
+          "description": "UI 文本配置",
+          "properties": {
+            "defaultSourceName": {
+              "type": "string",
+              "description": "默认镜像源显示文本"
+            },
+            "testingText": {
+              "type": "string",
+              "description": "测速中显示文本"
+            },
+            "testButtonText": {
+              "type": "string",
+              "description": "测速按钮文本"
+            },
+            "resetButtonText": {
+              "type": "string",
+              "description": "重置按钮文本"
+            },
+            "quitButtonText": {
+              "type": "string",
+              "description": "退出按钮文本"
+            }
+          }
+        }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "description": "应用行为配置",
+      "properties": {
+        "autoDetectTools": {
+          "type": "boolean",
+          "description": "自动检测已安装工具"
+        },
+        "autoBackupBeforeSwitch": {
+          "type": "boolean",
+          "description": "切换前自动备份"
+        },
+        "confirmBeforeReset": {
+          "type": "boolean",
+          "description": "重置前确认"
+        },
+        "closeMenuAfterSwitch": {
+          "type": "boolean",
+          "description": "切换后关闭菜单"
+        },
+        "restartDockerAfterOrbStackSwitch": {
+          "type": "boolean",
+          "description": "OrbStack 切换后重启 Docker"
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "description": "网络相关配置",
+      "properties": {
+        "userAgent": {
+          "type": "string",
+          "description": "HTTP 请求 User-Agent"
+        },
+        "timeout": {
+          "type": "number",
+          "description": "请求超时时间（秒）"
+        },
+        "maxRetries": {
+          "type": "number",
+          "description": "最大重试次数"
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "description": "路径配置",
+      "required": ["configDirectory", "cacheDirectory", "backupDirectory", "logDirectory"],
+      "properties": {
+        "configDirectory": {
+          "type": "string",
+          "description": "配置文件目录"
+        },
+        "cacheDirectory": {
+          "type": "string",
+          "description": "缓存文件目录"
+        },
+        "backupDirectory": {
+          "type": "string",
+          "description": "备份文件目录"
+        },
+        "logDirectory": {
+          "type": "string",
+          "description": "日志文件目录"
+        }
+      }
+    },
+    "remoteConfig": {
+      "type": "object",
+      "description": "远程配置相关设置",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "是否启用远程配置"
+        },
+        "url": {
+          "type": "string",
+          "description": "远程配置 URL",
+          "format": "uri"
+        },
+        "updateInterval": {
+          "type": "number",
+          "description": "更新间隔（秒）"
+        },
+        "fallbackToLocal": {
+          "type": "boolean",
+          "description": "远程失败时是否回退到本地配置"
+        },
+        "validateSchema": {
+          "type": "boolean",
+          "description": "是否验证 Schema"
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "description": "功能开关",
+      "properties": {
+        "speedTest": {
+          "type": "boolean",
+          "description": "是否启用测速功能"
+        },
+        "autoSelectFastest": {
+          "type": "boolean",
+          "description": "自动选择最快的源"
+        },
+        "notifications": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "是否启用通知"
+            },
+            "onSwitchSuccess": {
+              "type": "boolean",
+              "description": "切换成功时通知"
+            },
+            "onSwitchFailure": {
+              "type": "boolean",
+              "description": "切换失败时通知"
+            }
+          }
+        }
+      }
+    }
+  }
+}

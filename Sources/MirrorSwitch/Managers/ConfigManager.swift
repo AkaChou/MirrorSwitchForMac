@@ -39,19 +39,19 @@ class ConfigManager {
     // MARK: - Public Methods
 
     /// 加载配置
-    func loadConfig() -> AppConfiguration {
+    func loadConfig() -> MirrorSourceConfiguration {
         // 检查配置文件是否存在
         guard FileManager.default.fileExists(atPath: configFile.path) else {
             // 首次运行，保存默认配置
-            saveConfig(AppConfiguration.defaultConfig)
-            return AppConfiguration.defaultConfig
+            saveConfig(MirrorSourceConfiguration.defaultConfig)
+            return MirrorSourceConfiguration.defaultConfig
         }
 
         // 读取并解析配置文件
         guard let data = try? Data(contentsOf: configFile),
-              let config = try? JSONDecoder().decode(AppConfiguration.self, from: data) else {
+              let config = try? JSONDecoder().decode(MirrorSourceConfiguration.self, from: data) else {
             // 解析失败，返回默认配置
-            return AppConfiguration.defaultConfig
+            return MirrorSourceConfiguration.defaultConfig
         }
 
         // 加载选中状态
@@ -66,7 +66,7 @@ class ConfigManager {
     }
 
     /// 保存配置
-    func saveConfig(_ config: AppConfiguration) {
+    func saveConfig(_ config: MirrorSourceConfiguration) {
         guard let data = try? JSONEncoder().encode(config) else {
             print("⚠️ 配置编码失败")
             return

@@ -1,0 +1,711 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/mirror-switch/schemas/tools_config.schema.json",
+  "title": "MirrorSwitch Tools Configuration",
+  "description": "配置驱动架构的工具配置 Schema",
+  "type": "object",
+  "required": [
+    "version",
+    "tools"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "配置版本号",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "tools": {
+      "type": "array",
+      "description": "工具列表",
+      "items": {
+        "$ref": "#/definitions/tool"
+      }
+    }
+  },
+  "definitions": {
+    "tool": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "detection",
+        "sources",
+        "strategy"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "工具唯一标识",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "name": {
+          "type": "string",
+          "description": "工具显示名称"
+        },
+        "description": {
+          "type": "string",
+          "description": "工具描述"
+        },
+        "detection": {
+          "$ref": "#/definitions/detection"
+        },
+        "sources": {
+          "type": "array",
+          "description": "镜像源列表",
+          "items": {
+            "$ref": "#/definitions/source"
+          },
+          "minItems": 1
+        },
+        "strategy": {
+          "$ref": "#/definitions/strategy"
+        },
+        "backup": {
+          "$ref": "#/definitions/backup"
+        },
+        "metadata": {
+          "$ref": "#/definitions/metadata"
+        }
+      }
+    },
+    "detection": {
+      "type": "object",
+      "required": [
+        "command",
+        "arguments"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "检测命令"
+        },
+        "arguments": {
+          "type": "array",
+          "description": "命令参数",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customPaths": {
+          "type": "array",
+          "description": "自定义路径列表",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fallbackDetection": {
+          "$ref": "#/definitions/fallbackDetection"
+        }
+      }
+    },
+    "fallbackDetection": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "file",
+            "app",
+            "environmentVariable",
+            "script"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "文件路径 (type=file 时)"
+        },
+        "bundleId": {
+          "type": "string",
+          "description": "Bundle ID (type=app 时)"
+        },
+        "name": {
+          "type": "string",
+          "description": "变量名 (type=environmentVariable 时)"
+        },
+        "command": {
+          "type": "string",
+          "description": "命令 (type=script 时)"
+        },
+        "arguments": {
+          "type": "array",
+          "description": "命令参数 (type=script 时)",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "url"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "镜像源唯一标识"
+        },
+        "name": {
+          "type": "string",
+          "description": "镜像源显示名称"
+        },
+        "url": {
+          "type": "string",
+          "description": "镜像 URL",
+          "format": "uri"
+        },
+        "description": {
+          "type": "string",
+          "description": "镜像源描述"
+        },
+        "region": {
+          "type": "string",
+          "description": "地区信息"
+        },
+        "requiresAuth": {
+          "type": "boolean",
+          "description": "是否需要认证"
+        },
+        "auth": {
+          "$ref": "#/definitions/auth"
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "认证类型"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "command",
+            "xml",
+            "jsonpath",
+            "regex",
+            "keyvalue"
+          ],
+          "description": "策略类型"
+        },
+        "command": {
+          "$ref": "#/definitions/commandStrategy"
+        },
+        "xml": {
+          "$ref": "#/definitions/xmlStrategy"
+        },
+        "jsonpath": {
+          "$ref": "#/definitions/jsonpathStrategy"
+        },
+        "regex": {
+          "$ref": "#/definitions/regexStrategy"
+        },
+        "keyvalue": {
+          "$ref": "#/definitions/keyvalueStrategy"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "type",
+            "command"
+          ]
+        },
+        {
+          "required": [
+            "type",
+            "xml"
+          ]
+        },
+        {
+          "required": [
+            "type",
+            "jsonpath"
+          ]
+        },
+        {
+          "required": [
+            "type",
+            "regex"
+          ]
+        },
+        {
+          "required": [
+            "type",
+            "keyvalue"
+          ]
+        }
+      ]
+    },
+    "commandStrategy": {
+      "type": "object",
+      "required": [
+        "set",
+        "get"
+      ],
+      "properties": {
+        "set": {
+          "$ref": "#/definitions/commandSet"
+        },
+        "get": {
+          "$ref": "#/definitions/commandGet"
+        }
+      }
+    },
+    "commandSet": {
+      "type": "object",
+      "required": [
+        "command",
+        "arguments"
+      ],
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "requiresAdmin": {
+          "type": "boolean"
+        },
+        "workingDirectory": {
+          "type": "string"
+        },
+        "preCommands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/preCommand"
+          }
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        }
+      }
+    },
+    "preCommand": {
+      "type": "object",
+      "required": [
+        "command",
+        "arguments",
+        "captureAs"
+      ],
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "captureAs": {
+          "type": "string",
+          "description": "捕获结果的变量名"
+        },
+        "outputParser": {
+          "type": "string",
+          "enum": [
+            "trim",
+            "extractUrl",
+            "extractDomain",
+            "firstLine"
+          ]
+        }
+      }
+    },
+    "commandGet": {
+      "type": "object",
+      "required": [
+        "command",
+        "arguments",
+        "outputParser"
+      ],
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputParser": {
+          "type": "string",
+          "enum": [
+            "trim",
+            "extractUrl",
+            "extractDomain",
+            "firstLine",
+            "json",
+            "regex"
+          ]
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        }
+      }
+    },
+    "xmlStrategy": {
+      "type": "object",
+      "required": [
+        "filePath",
+        "set",
+        "get"
+      ],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "set": {
+          "$ref": "#/definitions/xmlSet"
+        },
+        "get": {
+          "$ref": "#/definitions/xmlGet"
+        }
+      }
+    },
+    "xmlSet": {
+      "type": "object",
+      "required": [
+        "xpath",
+        "value"
+      ],
+      "properties": {
+        "xpath": {
+          "type": "string",
+          "description": "XPath 表达式"
+        },
+        "value": {
+          "type": "string",
+          "description": "要设置的值,支持模板变量 {{url}}"
+        },
+        "namespaces": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "ensureStructure": {
+          "$ref": "#/definitions/ensureStructure"
+        }
+      }
+    },
+    "xmlGet": {
+      "type": "object",
+      "required": [
+        "xpath"
+      ],
+      "properties": {
+        "xpath": {
+          "type": "string"
+        },
+        "namespaces": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "attribute": {
+          "type": "string",
+          "description": "要获取的属性名"
+        }
+      }
+    },
+    "jsonpathStrategy": {
+      "type": "object",
+      "required": [
+        "filePath",
+        "set",
+        "get"
+      ],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "set": {
+          "$ref": "#/definitions/jsonpathSet"
+        },
+        "get": {
+          "$ref": "#/definitions/jsonpathGet"
+        }
+      }
+    },
+    "jsonpathSet": {
+      "type": "object",
+      "required": [
+        "jsonpath",
+        "value"
+      ],
+      "properties": {
+        "jsonpath": {
+          "type": "string",
+          "description": "JSONPath 表达式"
+        },
+        "value": {
+          "description": "要设置的值,支持任意 JSON 类型"
+        },
+        "mergeStrategy": {
+          "type": "string",
+          "enum": [
+            "replace",
+            "merge",
+            "append",
+            "prepend"
+          ]
+        },
+        "ensureStructure": {
+          "$ref": "#/definitions/ensureStructure"
+        }
+      }
+    },
+    "jsonpathGet": {
+      "type": "object",
+      "required": [
+        "jsonpath"
+      ],
+      "properties": {
+        "jsonpath": {
+          "type": "string"
+        }
+      }
+    },
+    "regexStrategy": {
+      "type": "object",
+      "required": [
+        "filePath",
+        "set",
+        "get"
+      ],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "set": {
+          "$ref": "#/definitions/regexSet"
+        },
+        "get": {
+          "$ref": "#/definitions/regexGet"
+        }
+      }
+    },
+    "regexSet": {
+      "type": "object",
+      "required": [
+        "pattern",
+        "replacement"
+      ],
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "正则表达式模式"
+        },
+        "replacement": {
+          "type": "string",
+          "description": "替换内容,支持捕获组 $1, $2 等"
+        },
+        "global": {
+          "type": "boolean",
+          "description": "是否全局替换"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "caseInsensitive",
+              "multiline",
+              "dotmatcheslineSeparators"
+            ]
+          }
+        }
+      }
+    },
+    "regexGet": {
+      "type": "object",
+      "required": [
+        "pattern"
+      ],
+      "properties": {
+        "pattern": {
+          "type": "string"
+        },
+        "captureGroup": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "捕获组索引,0 表示整个匹配"
+        }
+      }
+    },
+    "keyvalueStrategy": {
+      "type": "object",
+      "required": [
+        "filePath",
+        "set",
+        "get"
+      ],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "set": {
+          "$ref": "#/definitions/keyvalueSet"
+        },
+        "get": {
+          "$ref": "#/definitions/keyvalueGet"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "properties",
+            "env",
+            "conf",
+            "ini"
+          ]
+        }
+      }
+    },
+    "keyvalueSet": {
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "separator": {
+          "type": "string",
+          "default": "="
+        }
+      }
+    },
+    "keyvalueGet": {
+      "type": "object",
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "separator": {
+          "type": "string",
+          "default": "="
+        }
+      }
+    },
+    "ensureStructure": {
+      "type": "object",
+      "required": [
+        "createIfMissing",
+        "defaultStructure"
+      ],
+      "properties": {
+        "createIfMissing": {
+          "type": "boolean"
+        },
+        "defaultStructure": {
+          "type": "string",
+          "description": "默认结构模板,支持模板变量"
+        },
+        "createParentDirectories": {
+          "type": "boolean"
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "required": [
+        "filePath",
+        "backupFileName"
+      ],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "backupFileName": {
+          "type": "string"
+        },
+        "backupOriginal": {
+          "type": "boolean"
+        },
+        "originalBackupSuffix": {
+          "type": "string",
+          "default": ".original"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "supportedPlatforms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supportsSpeedTest": {
+          "type": "boolean"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "documentationURL": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  }
+}

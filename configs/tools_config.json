@@ -1,0 +1,80 @@
+{
+  "version": "1.0.0",
+  "tools": [
+    {
+      "id": "npm",
+      "name": "NPM",
+      "description": "Node Package Manager",
+      "detection": {
+        "command": "npm",
+        "arguments": [
+          "--version"
+        ]
+      },
+      "sources": [
+        {
+          "id": "npm-official",
+          "name": "官方源",
+          "url": "https://registry.npmjs.org/",
+          "description": "npm 官方源"
+        },
+        {
+          "id": "npm-taobao",
+          "name": "淘宝源",
+          "url": "https://registry.npmmirror.com/",
+          "description": "淘宝镜像",
+          "region": "CN"
+        },
+        {
+          "id": "npm-tencent",
+          "name": "腾讯云",
+          "url": "https://mirrors.cloud.tencent.com/npm/",
+          "description": "腾讯云镜像",
+          "region": "CN"
+        },
+        {
+          "id": "npm-huawei",
+          "name": "华为云",
+          "url": "https://mirrors.huaweicloud.com/repository/npm/",
+          "description": "华为云镜像",
+          "region": "CN"
+        }
+      ],
+      "strategy": {
+        "type": "command",
+        "set": {
+          "command": "npm",
+          "arguments": [
+            "config",
+            "set",
+            "registry",
+            "{{url}}"
+          ]
+        },
+        "get": {
+          "command": "npm",
+          "arguments": [
+            "config",
+            "get",
+            "registry"
+          ],
+          "outputParser": "trim"
+        }
+      },
+      "backup": {
+        "filePath": "~/.npmrc",
+        "backupFileName": ".npmrc.backup",
+        "backupOriginal": true
+      },
+      "metadata": {
+        "supportedPlatforms": [
+          "macOS",
+          "linux",
+          "windows"
+        ],
+        "supportsSpeedTest": true,
+        "documentationURL": "https://docs.npmjs.com/"
+      }
+    }
+  ]
+}

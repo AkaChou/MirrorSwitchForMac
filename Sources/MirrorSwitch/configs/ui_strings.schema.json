@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MirrorSwitch UI Strings Configuration",
+  "description": "UI 字符串配置文件定义，支持国际化",
+  "type": "object",
+  "required": ["version", "language", "strings"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "配置文件版本号"
+    },
+    "language": {
+      "type": "string",
+      "description": "语言代码（如 zh-CN, en-US）"
+    },
+    "strings": {
+      "type": "object",
+      "description": "UI 字符串",
+      "properties": {
+        "app": {
+          "type": "object",
+          "description": "应用相关字符串"
+        },
+        "menu": {
+          "type": "object",
+          "description": "菜单相关字符串"
+        },
+        "sources": {
+          "type": "object",
+          "description": "镜像源相关字符串"
+        },
+        "tools": {
+          "type": "object",
+          "description": "工具相关字符串"
+        },
+        "errors": {
+          "type": "object",
+          "description": "错误消息"
+        },
+        "notifications": {
+          "type": "object",
+          "description": "通知消息"
+        },
+        "settings": {
+          "type": "object",
+          "description": "设置界面字符串"
+        },
+        "about": {
+          "type": "object",
+          "description": "关于界面字符串"
+        }
+      }
+    }
+  }
+}

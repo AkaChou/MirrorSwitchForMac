@@ -7,8 +7,9 @@
 
 import Foundation
 
-/// 应用配置数据结构
-struct AppConfiguration: Codable {
+/// 镜像源配置数据结构（运行时状态）
+/// 用于存储工具的镜像源列表和当前选择状态
+struct MirrorSourceConfiguration: Codable {
     /// 配置版本
     let version: String
 
@@ -26,7 +27,7 @@ struct AppConfiguration: Codable {
     }
 
     /// 默认配置
-    static var defaultConfig: AppConfiguration {
+    static var defaultConfig: MirrorSourceConfiguration {
         let npmSources = [
             MirrorSource(
                 id: "npm-official",
@@ -129,7 +130,7 @@ struct AppConfiguration: Codable {
             )
         ]
 
-        return AppConfiguration(
+        return MirrorSourceConfiguration(
             version: "1.0.0",
             tools: [
                 .npm: npmSources,

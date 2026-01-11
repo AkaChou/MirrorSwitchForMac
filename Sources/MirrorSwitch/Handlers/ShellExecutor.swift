@@ -53,7 +53,7 @@ class ShellExecutor {
                 standardError: error
             )
         } catch {
-            throw ToolHandlerError.commandExecutionFailed(error.localizedDescription)
+            throw SourceManagerError.commandExecutionFailed(error.localizedDescription)
         }
     }
 

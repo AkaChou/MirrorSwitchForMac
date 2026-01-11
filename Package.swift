@@ -15,12 +15,26 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // 不需要外部依赖，使用系统框架即可
+        // XML 解析库，用于 Maven 等工具的配置文件处理
+        .package(url: "https://github.com/tadija/AEXML.git", from: "4.6.1")
     ],
     targets: [
         .executableTarget(
             name: "MirrorSwitch",
-            dependencies: []
+            dependencies: [.product(name: "AEXML", package: "AEXML")],
+            exclude: [
+                // 排除不需要打包的文件
+                "configs/README.md",
+                "configs/ui_strings.schema.json",
+            ],
+            resources: [
+                // 配置文件
+                .process("configs/app_config.json"),
+                .process("configs/app_config.schema.json"),
+                .process("configs/tools_config.json"),
+                .process("configs/tools_config.schema.json"),
+                .process("configs/ui_strings.json"),
+            ]
         ),
     ]
 )
