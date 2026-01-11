@@ -310,6 +310,32 @@ class MenuUpdateHelper: NSObject {
         let groupedTools = ConfigurationDrivenSourceManager.shared.getToolsGroupedByConfigSource()
 
         for (configSource, tools) in groupedTools {
+            // 先收集该配置源下所有可见的工具
+            var visibleTools: [(ToolConfiguration, String)] = []
+
+            for toolConfig in tools {
+                let toolId = toolConfig.id
+
+                // 检查工具可见性（考虑配置源的设置）
+                guard ConfigSourceManager.shared.isToolVisibleInMenu(
+                    toolId: toolId,
+                    configSourceId: configSource.id
+                ) else {
+                    debugLog("⏭️  跳过工具 \(toolConfig.name)（已在配置中隐藏）")
+                    continue
+                }
+
+                // 使用组合键，防止不同配置源的工具相互覆盖
+                let uniqueKey = "\(configSource.id.uuidString)_\(toolId)"
+                visibleTools.append((toolConfig, uniqueKey))
+            }
+
+            // 如果该配置源下没有任何可见的工具，跳过分组标题和分隔线
+            if visibleTools.isEmpty {
+                debugLog("⏭️  跳过配置源分组 \(configSource.name)（所有工具已隐藏）")
+                continue
+            }
+
             // 添加分组分隔线
             let separatorItem = NSMenuItem.separator()
             menu.addItem(separatorItem)
@@ -325,24 +351,10 @@ class MenuUpdateHelper: NSObject {
             titleItem.isEnabled = false
             menu.addItem(titleItem)
 
-            // 遍历该配置源的工具
-            for toolConfig in tools {
-                let toolId = toolConfig.id
-
-                // 使用组合键，防止不同配置源的工具相互覆盖
-                let uniqueKey = "\(configSource.id.uuidString)_\(toolId)"
-
-                // 检查工具可见性（考虑配置源的设置）
-                guard ConfigSourceManager.shared.isToolVisibleInMenu(
-                    toolId: toolId,
-                    configSourceId: configSource.id
-                ) else {
-                    debugLog("⏭️  跳过工具 \(toolConfig.name)（已在配置中隐藏）")
-                    continue
-                }
-
+            // 遍历可见工具，构建菜单项
+            for (toolConfig, uniqueKey) in visibleTools {
                 // 获取当前选中的源（来自该配置源的）
-                let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
+                let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolConfig.id)
                 let currentSource = sources.first(where: { $0.isSelected })
 
                 // 更新当前源缓存（使用组合键）
@@ -350,7 +362,7 @@ class MenuUpdateHelper: NSObject {
 
                 // 构建菜单项
                 let displayName = toolConfig.name
-                let formattedVersion = toolVersions[toolId].flatMap { formatVersion($0) }
+                let formattedVersion = toolVersions[toolConfig.id].flatMap { formatVersion($0) }
 
                 let menuItemView = MenuItemView(
                     frame: NSRect(x: 0, y: 0, width: LayoutConstants.primaryMenuWidth, height: LayoutConstants.primaryMenuHeight),
