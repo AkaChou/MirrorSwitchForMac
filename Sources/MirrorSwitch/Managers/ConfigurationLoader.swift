@@ -166,7 +166,12 @@ class ConfigurationLoader {
             }
             // 展开波浪号
             let expandedPath = NSString(string: path).expandingTildeInPath
+            debugLog("🔍 本地配置路径: \(path)")
+            debugLog("🔍 展开后路径: \(expandedPath)")
             let url = URL(fileURLWithPath: expandedPath)
+            debugLog("🔍 URL path: \(url.path)")
+            debugLog("🔍 URL 绝对路径: \(url.absoluteString)")
+            debugLog("🔍 文件存在: \(FileManager.default.fileExists(atPath: url.path))")
             return try loadLocalConfiguration(from: url)
 
         case .remote:
@@ -260,7 +265,15 @@ class ConfigurationLoader {
 
     /// 加载本地配置文件
     private func loadLocalConfiguration(from url: URL) throws -> ToolsConfiguration {
-        let data = try Data(contentsOf: url)
+        debugLog("📖 开始加载本地配置: \(url.path)")
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+            debugLog("✅ 成功读取数据，大小: \(data.count) bytes")
+        } catch {
+            debugLog("❌ 读取数据失败: \(error.localizedDescription)")
+            throw ConfigurationError.fileNotFound("无法读取配置文件: \(error.localizedDescription)")
+        }
 
         // 验证配置
         try validateConfiguration(data)
@@ -427,16 +440,21 @@ class ConfigurationLoader {
 
     /// 验证配置
     private func validateConfiguration(_ data: Data) throws {
+        debugLog("🔍 开始验证配置...")
         let decoder = JSONDecoder()
 
         do {
             // 尝试解码，基本验证 JSON 结构
+            debugLog("🔍 尝试解码 JSON...")
             let config = try decoder.decode(ToolsConfiguration.self, from: data)
+            debugLog("✅ JSON 解码成功，工具数量: \(config.tools.count)")
 
             // 验证版本兼容性
             guard isVersionCompatible(config.version) else {
+                debugLog("❌ 版本不兼容: \(config.version)")
                 throw ConfigurationError.versionMismatch(config.version)
             }
+            debugLog("✅ 版本验证通过: \(config.version)")
 
             // 验证每个工具的必需字段
             var errors: [String] = []
@@ -447,11 +465,16 @@ class ConfigurationLoader {
             }
 
             if !errors.isEmpty {
+                debugLog("❌ 工具验证失败: \(errors)")
                 throw ConfigurationError.validationFailed(errors)
             }
+
+            debugLog("✅ 配置验证通过")
         } catch let error as ConfigurationError {
+            debugLog("❌ 配置错误: \(error.localizedDescription)")
             throw error
         } catch {
+            debugLog("❌ 解析错误: \(error.localizedDescription)")
             throw ConfigurationError.parseFailed(error.localizedDescription)
         }
     }

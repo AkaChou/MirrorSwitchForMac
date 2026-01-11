@@ -6,10 +6,6 @@
       "name": "OrbStack",
       "description": "Docker 容器管理工具",
       "detection": {
-        "command": "orb",
-        "arguments": [
-          "--version"
-        ],
         "customPaths": [
           "/Applications/OrbStack.app"
         ],

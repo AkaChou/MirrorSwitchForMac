@@ -70,11 +70,15 @@ class DynamicToolDetector {
             }
         }
 
-        // 1. 尝试主要检测方式（命令）
-        let result = await detectByCommand(tool)
+        // 1. 尝试主要检测方式（命令）- 仅当 command 不为空时
+        if !tool.detection.command.isEmpty {
+            let result = await detectByCommand(tool)
 
-        if let version = parseVersion(result, toolId: tool.id) {
-            return version
+            if let version = parseVersion(result, toolId: tool.id) {
+                return version
+            }
+        } else {
+            debugLog("⚠️ 未配置命令检测，跳过")
         }
 
         // 2. 尝试备用检测方式
@@ -219,6 +223,18 @@ class DynamicToolDetector {
     private func tryDetectAtPath(_ path: String, tool: ToolConfiguration) async -> String? {
         let expandedPath = NSString(string: path).expandingTildeInPath
 
+        // 特殊处理：如果是 macOS 应用包（.app），提取应用版本
+        if expandedPath.hasSuffix(".app") {
+            debugLog("🔍 检测到 macOS 应用包: \(expandedPath)")
+            if let version = extractAppVersion(from: expandedPath) {
+                debugLog("✅ 从应用包提取版本: \(version)")
+                return version
+            }
+            // 如果无法提取版本，返回工具名称表示检测到
+            debugLog("✅ 应用包存在，返回工具标识")
+            return tool.name
+        }
+
         // 首先尝试直接执行路径（如果是可执行文件）
         if FileManager.default.fileExists(atPath: expandedPath) {
             var isDir: ObjCBool = false
@@ -239,44 +255,52 @@ class DynamicToolDetector {
         }
 
         // 如果路径是目录或者直接执行失败，尝试在目录下查找可执行文件
-        // 构建可能的可执行文件路径
-        let command = tool.detection.command
-        let executableNames = [
-            command,
-            "\(command).sh",
-            "bin/\(command)",
-            "bin/\(command).sh"
-        ]
+        // 只有当 command 不为空时才尝试查找可执行文件
+        if !tool.detection.command.isEmpty {
+            let command = tool.detection.command
+            let executableNames = [
+                command,
+                "\(command).sh",
+                "bin/\(command)",
+                "bin/\(command).sh"
+            ]
 
-        for name in executableNames {
-            let fullPath = "\(expandedPath)/\(name)"
+            for name in executableNames {
+                let fullPath = "\(expandedPath)/\(name)"
 
-            // 检查文件是否存在且可执行
-            var isDir: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir),
-                  !isDir.boolValue else {
-                continue
-            }
-
-            guard FileManager.default.isExecutableFile(atPath: fullPath) else {
-                continue
-            }
-
-            debugLog("✅ 找到可执行文件: \(fullPath)")
-
-            // 尝试获取版本信息
-            do {
-                let result = try await ShellExecutor.execute(
-                    fullPath,
-                    arguments: tool.detection.arguments
-                )
-                if let version = parseVersion(result.standardOutput, toolId: tool.id) {
-                    debugLog("✅ 检测到版本: \(version)")
-                    return version
+                // 检查文件是否存在且可执行
+                var isDir: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir),
+                      !isDir.boolValue else {
+                    continue
                 }
-            } catch {
-                debugLog("⚠️ 执行失败: \(error.localizedDescription)")
+
+                guard FileManager.default.isExecutableFile(atPath: fullPath) else {
+                    continue
+                }
+
+                debugLog("✅ 找到可执行文件: \(fullPath)")
+
+                // 尝试获取版本信息
+                do {
+                    let result = try await ShellExecutor.execute(
+                        fullPath,
+                        arguments: tool.detection.arguments
+                    )
+                    if let version = parseVersion(result.standardOutput, toolId: tool.id) {
+                        debugLog("✅ 检测到版本: \(version)")
+                        return version
+                    }
+                } catch {
+                    debugLog("⚠️ 执行失败: \(error.localizedDescription)")
+                }
             }
+        }
+
+        // 如果路径存在，返回工具名称表示检测到（用于没有命令检测的工具）
+        if FileManager.default.fileExists(atPath: expandedPath) {
+            debugLog("✅ 路径存在，返回工具标识: \(expandedPath)")
+            return tool.name
         }
 
         return nil

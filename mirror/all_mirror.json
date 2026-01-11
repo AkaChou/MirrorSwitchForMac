@@ -357,10 +357,6 @@
       "name": "OrbStack",
       "description": "Docker 容器管理工具",
       "detection": {
-        "command": "orb",
-        "arguments": [
-          "--version"
-        ],
         "customPaths": [
           "/Applications/OrbStack.app"
         ],
@@ -455,26 +451,36 @@
         "backupFileName": "docker.json.backup",
         "backupOriginal": true
       },
-      "postSwitchActions": [
-        {
-          "type": "showAlert",
-          "delay": 0,
-          "showAlert": {
-            "title": "重启 OrbStack",
-            "message": "镜像源已切换，请重启 OrbStack 以使配置生效。",
-            "success": true
+      "postActions": {
+        "onSourceChanged": {
+          "type": "showConfirmationDialog",
+          "title": "OrbStack 配置已更新",
+          "message": "镜像源配置已成功修改。\n\n要使配置生效，需要重启 OrbStack Docker 引擎。\n\n是否立即重启？",
+          "confirmButton": "立即重启",
+          "cancelButton": "稍后重启",
+          "confirmCommand": {
+            "command": "/usr/local/bin/orb",
+            "arguments": [
+              "restart",
+              "docker"
+            ]
           }
         },
-        {
-          "type": "command",
-          "delay": 1,
-          "command": "orb",
-          "arguments": [
-            "restart",
-            "docker"
-          ]
+        "onReset": {
+          "type": "showConfirmationDialog",
+          "title": "OrbStack 配置已恢复",
+          "message": "默认配置已成功恢复。\n\n要使配置生效，需要重启 OrbStack Docker 引擎。\n\n是否立即重启？",
+          "confirmButton": "立即重启",
+          "cancelButton": "稍后重启",
+          "confirmCommand": {
+            "command": "/usr/local/bin/orb",
+            "arguments": [
+              "restart",
+              "docker"
+            ]
+          }
         }
-      ],
+      },
       "metadata": {
         "supportedPlatforms": [
           "macOS"

@@ -169,7 +169,9 @@ class ConfigSourceManager {
                 }
             } else {
                 // 验证本地文件
-                let url = URL(fileURLWithPath: urlString)
+                // 展开波浪号路径
+                let expandedPath = NSString(string: urlString).expandingTildeInPath
+                let url = URL(fileURLWithPath: expandedPath)
                 let fileExists = fileManager.fileExists(atPath: url.path)
 
                 let status: ConfigStatus = fileExists ? .valid : .error

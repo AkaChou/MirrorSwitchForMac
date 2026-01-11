@@ -87,10 +87,10 @@ struct ToolMetadata: Codable {
 
 /// 工具检测配置
 struct DetectionConfiguration: Codable {
-    /// 检测命令
+    /// 检测命令（可选，有些工具可能不需要命令检测）
     let command: String
 
-    /// 命令参数
+    /// 命令参数（可选，有些工具可能不需要命令检测）
     let arguments: [String]
 
     /// 自定义路径列表 (支持通配符 *)
@@ -98,6 +98,40 @@ struct DetectionConfiguration: Codable {
 
     /// 备用检测方式 (当命令检测失败时)
     let fallbackDetection: FallbackDetection?
+
+    // 默认成员初始化器
+    init(command: String = "", arguments: [String] = [], customPaths: [String]? = nil, fallbackDetection: FallbackDetection? = nil) {
+        self.command = command
+        self.arguments = arguments
+        self.customPaths = customPaths
+        self.fallbackDetection = fallbackDetection
+    }
+
+    // 自定义解码器，支持缺失的 command 和 arguments
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.command = try container.decodeIfPresent(String.self, forKey: .command) ?? ""
+        self.arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
+        self.customPaths = try container.decodeIfPresent([String].self, forKey: .customPaths)
+        self.fallbackDetection = try container.decodeIfPresent(FallbackDetection.self, forKey: .fallbackDetection)
+    }
+
+    /// 编码器
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if !command.isEmpty {
+            try container.encode(command, forKey: .command)
+        }
+        if !arguments.isEmpty {
+            try container.encode(arguments, forKey: .arguments)
+        }
+        try container.encodeIfPresent(customPaths, forKey: .customPaths)
+        try container.encodeIfPresent(fallbackDetection, forKey: .fallbackDetection)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case command, arguments, customPaths, fallbackDetection
+    }
 }
 
 /// 备用检测方式
