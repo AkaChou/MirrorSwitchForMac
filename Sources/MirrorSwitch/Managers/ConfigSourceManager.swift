@@ -312,13 +312,20 @@ class ConfigSourceManager {
     }
 
     /// 检查工具是否应该在一级菜单中显示
-    /// - Parameter toolId: 工具 ID
-    /// - Returns: 是否应该显示（至少有一个配置源允许显示）
-    func isToolVisibleInMenu(toolId: String) -> Bool {
+    /// - Parameters:
+    ///   - toolId: 工具 ID
+    ///   - configSourceId: 配置源 ID（可选，用于精确匹配指定配置源）
+    /// - Returns: 是否应该显示
+    func isToolVisibleInMenu(toolId: String, configSourceId: UUID? = nil) -> Bool {
         var hasExplicitConfig = false  // 是否有配置源明确配置了该工具的可见性
 
         // 检查所有启用的配置源
         for source in getEnabledSources() {
+            // 如果指定了配置源，只检查该配置源
+            if let configSourceId = configSourceId, source.id != configSourceId {
+                continue
+            }
+
             // 获取该配置源的工具可见性设置
             guard let visibility = getToolVisibility(configSourceId: source.id) else {
                 continue  // 该配置源没有设置过任何工具可见性，跳过

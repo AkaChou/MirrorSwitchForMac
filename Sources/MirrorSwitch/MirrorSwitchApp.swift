@@ -288,47 +288,70 @@ class MenuUpdateHelper: NSObject {
         let menu = NSMenu()
         menu.delegate = self
 
-        // 为每个工具创建子菜单（包含版本信息和当前源）
-        // 从配置驱动管理器获取所有工具配置
-        let tools = ConfigurationDrivenSourceManager.shared.getAllTools()
+        // 改为按配置源分组
+        let groupedTools = ConfigurationDrivenSourceManager.shared.getToolsGroupedByConfigSource()
 
-        for toolConfig in tools {
-            let toolId = toolConfig.id
+        for (configSource, tools) in groupedTools {
+            // 添加分组分隔线
+            let separatorItem = NSMenuItem.separator()
+            menu.addItem(separatorItem)
 
-            // 检查工具是否在一级菜单中可见
-            guard ConfigSourceManager.shared.isToolVisibleInMenu(toolId: toolId) else {
-                debugLog("⏭️  跳过工具 \(toolConfig.name)（已在配置中隐藏）")
-                continue
-            }
-
-            // 获取当前选中的源
-            let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
-            let currentSource = sources.first(where: { $0.isSelected })
-            // 更新当前源（包括 nil 的情况）
-            toolCurrentSources[toolId] = currentSource
-
-            // 构建标题：工具名 + 版本号（如果有）
-            let displayName = toolConfig.name
-            let formattedVersion = toolVersions[toolId].flatMap { formatVersion($0) }
-
-            // 创建自定义视图菜单项
-            let menuItemView = MenuItemView(
-                frame: NSRect(x: 0, y: 0, width: LayoutConstants.primaryMenuWidth, height: LayoutConstants.primaryMenuHeight),
-                toolName: displayName,
-                version: formattedVersion,
-                sourceName: currentSource?.name ?? "未选择"
+            // 添加分组标题（灰色样式）
+            let titleText = "\(configSource.name)"
+            let attributedString = NSAttributedString(
+                string: titleText,
+                attributes: [.foregroundColor: NSColor.secondaryLabelColor]
             )
+            let titleItem = NSMenuItem()
+            titleItem.attributedTitle = attributedString
+            titleItem.isEnabled = false
+            menu.addItem(titleItem)
 
-            // 保存 MenuItemView 引用
-            menuItemViews[toolId] = menuItemView
+            // 遍历该配置源的工具
+            for toolConfig in tools {
+                let toolId = toolConfig.id
 
-            let menuItem = NSMenuItem()
-            menuItem.view = menuItemView
-            menu.addItem(menuItem)
+                // 使用组合键，防止不同配置源的工具相互覆盖
+                let uniqueKey = "\(configSource.id.uuidString)_\(toolId)"
 
-            // 创建子菜单
-            let submenu = buildSubMenu(for: toolConfig)
-            menuItem.submenu = submenu
+                // 检查工具可见性（考虑配置源的设置）
+                guard ConfigSourceManager.shared.isToolVisibleInMenu(
+                    toolId: toolId,
+                    configSourceId: configSource.id
+                ) else {
+                    debugLog("⏭️  跳过工具 \(toolConfig.name)（已在配置中隐藏）")
+                    continue
+                }
+
+                // 获取当前选中的源（来自该配置源的）
+                let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
+                let currentSource = sources.first(where: { $0.isSelected })
+
+                // 更新当前源缓存（使用组合键）
+                toolCurrentSources[uniqueKey] = currentSource
+
+                // 构建菜单项
+                let displayName = toolConfig.name
+                let formattedVersion = toolVersions[toolId].flatMap { formatVersion($0) }
+
+                let menuItemView = MenuItemView(
+                    frame: NSRect(x: 0, y: 0, width: LayoutConstants.primaryMenuWidth, height: LayoutConstants.primaryMenuHeight),
+                    toolName: displayName,
+                    version: formattedVersion,
+                    sourceName: currentSource?.name ?? "未选择"
+                )
+
+                // 保存 view 引用（使用组合键）
+                menuItemViews[uniqueKey] = menuItemView
+
+                let menuItem = NSMenuItem()
+                menuItem.view = menuItemView
+                menu.addItem(menuItem)
+
+                // 创建子菜单
+                let submenu = buildSubMenu(for: toolConfig)
+                menuItem.submenu = submenu
+            }
         }
 
         // 添加分隔线
@@ -481,77 +504,16 @@ class MenuUpdateHelper: NSObject {
     }
 
     private func refreshMenu() {
-        guard let statusItem = statusItem,
-              let menu = statusItem.menu else { return }
+        guard statusItem != nil else { return }
 
         debugLog("🔄 refreshMenu 被调用，准备重建菜单")
         debugLog("🔄 重建前 speedTestViews keys: \(speedTestViews.keys)")
 
-        // 重建整个菜单（最可靠的方式）
-        _ = menu  // 保留旧的菜单引用
+        // 直接调用 buildMenu() 重建菜单
+        // 这样可以确保使用最新的分组逻辑和组合键
+        buildMenu()
 
-        // 创建新菜单
-        let newMenu = NSMenu()
-        newMenu.delegate = self
-
-        // 为每个工具创建子菜单（包含版本信息和当前源）
-        let tools = ConfigurationDrivenSourceManager.shared.getAllTools()
-        for toolConfig in tools {
-            let toolId = toolConfig.id
-
-            // 检查工具是否在一级菜单中可见
-            guard ConfigSourceManager.shared.isToolVisibleInMenu(toolId: toolId) else {
-                debugLog("⏭️  跳过工具 \(toolConfig.name)（已在配置中隐藏）")
-                continue
-            }
-
-            // 获取当前选中的源
-            let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
-            let currentSource = sources.first(where: { $0.isSelected })
-            // 更新当前源（包括 nil 的情况）
-            toolCurrentSources[toolId] = currentSource
-
-            // 构建标题：工具名 + 版本号（如果有）
-            let displayName = toolConfig.name
-            let formattedVersion = toolVersions[toolId].flatMap { formatVersion($0) }
-
-            // 创建自定义视图菜单项
-            let menuItemView = MenuItemView(
-                frame: NSRect(x: 0, y: 0, width: LayoutConstants.primaryMenuWidth, height: LayoutConstants.primaryMenuHeight),
-                toolName: displayName,
-                version: formattedVersion,
-                sourceName: currentSource?.name ?? "未选择"
-            )
-
-            let menuItem = NSMenuItem()
-            menuItem.view = menuItemView
-            newMenu.addItem(menuItem)
-
-            // 保存 view 引用
-            menuItemViews[toolId] = menuItemView
-
-            // 创建子菜单
-            let submenu = buildSubMenu(for: toolConfig)
-            menuItem.submenu = submenu
-        }
-
-        // 添加分隔线（工具列表与配置选项之间）
-        newMenu.addItem(NSMenuItem.separator())
-
-        // 配置菜单项
-        let configMenuItem = createConfigMenuItem()
-        newMenu.addItem(configMenuItem)
-
-        newMenu.addItem(NSMenuItem.separator())
-
-        let quitItem = NSMenuItem(title: "退出", action: #selector(quitApp), keyEquivalent: "q")
-        quitItem.target = self
-        newMenu.addItem(quitItem)
-
-        statusItem.menu = newMenu
-
-        debugLog("🔄 重建后 speedTestViews keys: \(speedTestViews.keys)")
-        print("🔄 refreshMenu 完成")
+        debugLog("✅ 菜单重建完成")
     }
 
     /// 开始测速
@@ -657,13 +619,19 @@ class MenuUpdateHelper: NSObject {
     ///
     /// - Parameter toolId: 要更新的工具 ID
     func updatePrimaryMenuItem(for toolId: String) {
-        guard let menuItemView = menuItemViews[toolId] else {
+        // 根据工具 ID 查找对应的组合键
+        guard let uniqueKey = findKeyForTool(toolId) else {
+            debugLog("❌ 找不到 toolId=\(toolId) 的组合键")
+            return
+        }
+
+        guard let menuItemView = menuItemViews[uniqueKey] else {
             debugLog("❌ 找不到 toolId=\(toolId) 的一级菜单 view")
             return
         }
 
         // 从 toolCurrentSources 获取当前选中的源
-        guard let currentSource = toolCurrentSources[toolId] else {
+        guard let currentSource = toolCurrentSources[uniqueKey] else {
             // 没有选中的源，显示"未选择"
             menuItemView.updateSourceName("未选择")
             debugLog("✅ 一级菜单已更新: \(toolId) -> 未选择")
@@ -673,6 +641,14 @@ class MenuUpdateHelper: NSObject {
         // 更新显示的源名称
         menuItemView.updateSourceName(currentSource.name)
         debugLog("✅ 一级菜单已更新: \(toolId) -> \(currentSource.name)")
+    }
+
+    /// 根据工具 ID 查找对应的组合键
+    /// - Parameter toolId: 工具 ID
+    /// - Returns: 组合键，如果未找到返回 nil
+    private func findKeyForTool(_ toolId: String) -> String? {
+        // 在 menuItemViews 中查找以 "_\(toolId)" 结尾的键
+        return menuItemViews.keys.first { $0.hasSuffix("_\(toolId)") }
     }
 
     @objc private func selectSource(_ sender: NSMenuItem) {
@@ -701,8 +677,11 @@ class MenuUpdateHelper: NSObject {
             do {
                 try await ConfigurationDrivenSourceManager.shared.switchSource(toolId: toolId, source: source)
                 await MainActor.run {
-                    // 更新 toolCurrentSources 字典
-                    self.toolCurrentSources[toolId] = source
+                    // 根据工具 ID 查找对应的组合键
+                    if let uniqueKey = self.findKeyForTool(toolId) {
+                        // 更新 toolCurrentSources 字典
+                        self.toolCurrentSources[uniqueKey] = source
+                    }
 
                     // 直接更新镜像源列表的对勾状态
                     self.updateSourceList(for: toolId)
@@ -959,13 +938,16 @@ class MenuUpdateHelper: NSObject {
                 let sourceId = ConfigurationDrivenSourceManager.shared.getCurrentSelection(toolId: toolId)
                 let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
 
-                if let sourceId = sourceId,
-                   let currentSource = sources.first(where: { $0.id == sourceId }) {
-                    // 有匹配的镜像源
-                    toolCurrentSources[toolId] = currentSource
-                } else {
-                    // 没有匹配的镜像源，清除缓存
-                    toolCurrentSources.removeValue(forKey: toolId)
+                // 根据工具 ID 查找对应的组合键
+                if let uniqueKey = self.findKeyForTool(toolId) {
+                    if let sourceId = sourceId,
+                       let currentSource = sources.first(where: { $0.id == sourceId }) {
+                        // 有匹配的镜像源
+                        toolCurrentSources[uniqueKey] = currentSource
+                    } else {
+                        // 没有匹配的镜像源，清除缓存
+                        toolCurrentSources.removeValue(forKey: uniqueKey)
+                    }
                 }
 
                 await MainActor.run {

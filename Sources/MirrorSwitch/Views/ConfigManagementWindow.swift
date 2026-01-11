@@ -54,6 +54,9 @@ class ConfigManagementWindow: NSWindowController {
     /// 当前选中的配置源
     private var selectedConfigSource: ConfigSource?
 
+    /// 当前选中的配置源 ID
+    private var selectedConfigSourceId: UUID?
+
     // MARK: - 初始化
 
     init() {
@@ -192,6 +195,9 @@ class ConfigManagementWindow: NSWindowController {
 
         nameTextField = NSTextField()
         nameTextField.placeholderString = "例如: 我的 Maven 配置"
+        nameTextField.isEditable = true        // 明确设置为可编辑
+        nameTextField.isSelectable = true      // 允许选择文本
+        nameTextField.allowsEditingTextAttributes = false  // 禁用富文本编辑
         nameTextField.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(nameTextField)
 
@@ -203,6 +209,9 @@ class ConfigManagementWindow: NSWindowController {
 
         urlTextField = NSTextField()
         urlTextField.placeholderString = typeSegmentedControl.selectedSegment == 0 ? "~/Documents/config.json" : "https://example.com/config.json"
+        urlTextField.isEditable = true         // 明确设置为可编辑
+        urlTextField.isSelectable = true       // 允许选择文本
+        urlTextField.allowsEditingTextAttributes = false
         urlTextField.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(urlTextField)
 
@@ -308,8 +317,8 @@ class ConfigManagementWindow: NSWindowController {
             typeSegmentedControl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             typeSegmentedControl.widthAnchor.constraint(equalToConstant: 200),
 
-            // 名称标签
-            nameLabel.topAnchor.constraint(equalTo: typeSegmentedControl.bottomAnchor, constant: 15),
+            // 名称标签 - 使用 centerYAnchor 与输入框对齐
+            nameLabel.centerYAnchor.constraint(equalTo: nameTextField.centerYAnchor),
             nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             nameLabel.widthAnchor.constraint(equalToConstant: 50),
 
@@ -319,8 +328,8 @@ class ConfigManagementWindow: NSWindowController {
             nameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             nameTextField.heightAnchor.constraint(equalToConstant: 24),
 
-            // URL 标签
-            urlLabel.topAnchor.constraint(equalTo: nameTextField.bottomAnchor, constant: 10),
+            // URL 标签 - 使用 centerYAnchor 与输入框对齐
+            urlLabel.centerYAnchor.constraint(equalTo: urlTextField.centerYAnchor),
             urlLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             urlLabel.widthAnchor.constraint(equalToConstant: 50),
 
@@ -373,9 +382,15 @@ class ConfigManagementWindow: NSWindowController {
         loadToolsList()
     }
 
-    /// 加载工具列表（从 ConfigurationDrivenSourceManager）
+    /// 加载工具列表（从选中的配置源）
     private func loadToolsList() {
-        toolsList = ConfigurationDrivenSourceManager.shared.getAllTools()
+        // 如果有选中的配置源，只加载该配置源的工具
+        if let configSourceId = selectedConfigSourceId {
+            toolsList = ConfigurationDrivenSourceManager.shared.getTools(forConfigSource: configSourceId) ?? []
+        } else {
+            // 如果没有选中配置源，显示空列表
+            toolsList = []
+        }
     }
 
     /// 选中配置源时更新工具可见性表格
@@ -562,7 +577,11 @@ class ConfigManagementWindow: NSWindowController {
 extension ConfigManagementWindow: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int {
         if tableView == toolVisibilityTableView {
-            return selectedConfigSource != nil ? toolsList.count : 0
+            if selectedConfigSourceId == nil {
+                // 没有选中配置源时，显示提示行
+                return 1
+            }
+            return toolsList.count
         }
         return configSources.count
     }
@@ -574,7 +593,33 @@ extension ConfigManagementWindow: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         // 处理工具可见性表格
         if tableView == toolVisibilityTableView {
-            guard selectedConfigSource != nil, row < toolsList.count else { return nil }
+            // 如果没有选中配置源，显示提示信息
+            if selectedConfigSourceId == nil {
+                guard let cellView = tableView.makeView(
+                    withIdentifier: NSUserInterfaceItemIdentifier("toolEmptyHint"),
+                    owner: self
+                ) as? NSTableCellView else {
+                    // 创建提示单元格
+                    let cellView = NSTableCellView()
+                    cellView.identifier = NSUserInterfaceItemIdentifier("toolEmptyHint")
+
+                    let textField = NSTextField(labelWithString: "请先在上方选择一个配置源")
+                    textField.textColor = .secondaryLabelColor
+                    textField.font = NSFont.systemFont(ofSize: 13)
+                    textField.translatesAutoresizingMaskIntoConstraints = false
+                    cellView.addSubview(textField)
+
+                    NSLayoutConstraint.activate([
+                        textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                        textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 10)
+                    ])
+
+                    return cellView
+                }
+                return cellView
+            }
+
+            guard row < toolsList.count else { return nil }
 
             let tool = toolsList[row]
             let columnId = tableColumn?.identifier.rawValue ?? ""
@@ -685,13 +730,19 @@ extension ConfigManagementWindow: NSTableViewDelegate {
 
     /// 配置源选中事件
     func tableViewSelectionDidChange(_ notification: Notification) {
-        let selectedRow = tableView.selectedRow
-        if selectedRow >= 0 && selectedRow < configSources.count {
-            selectedConfigSource = configSources[selectedRow]
-            updateToolVisibilityTable()
-        } else {
-            selectedConfigSource = nil
-            toolVisibilityTableView.reloadData()
+        guard let tableView = notification.object as? NSTableView else { return }
+
+        if tableView == self.tableView {
+            let selectedRow = tableView.selectedRow
+            if selectedRow >= 0 && selectedRow < configSources.count {
+                selectedConfigSource = configSources[selectedRow]
+                selectedConfigSourceId = selectedConfigSource?.id
+                updateToolVisibilityTable()
+            } else {
+                selectedConfigSource = nil
+                selectedConfigSourceId = nil
+                updateToolVisibilityTable()
+            }
         }
     }
 

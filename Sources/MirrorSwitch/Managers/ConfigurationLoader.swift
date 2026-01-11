@@ -322,7 +322,10 @@ class ConfigurationLoader {
                     description: "npm 官方源",
                     region: nil,
                     requiresAuth: nil,
-                    auth: nil
+                    auth: nil,
+                    configSourceId: nil,
+                    configSourceName: nil,
+                    configSourceIsBuiltin: nil
                 ),
                 SourceConfiguration(
                     id: "npm-taobao",
@@ -331,7 +334,10 @@ class ConfigurationLoader {
                     description: "淘宝镜像",
                     region: "CN",
                     requiresAuth: nil,
-                    auth: nil
+                    auth: nil,
+                    configSourceId: nil,
+                    configSourceName: nil,
+                    configSourceIsBuiltin: nil
                 ),
                 SourceConfiguration(
                     id: "npm-tencent",
@@ -340,7 +346,10 @@ class ConfigurationLoader {
                     description: "腾讯云镜像",
                     region: "CN",
                     requiresAuth: nil,
-                    auth: nil
+                    auth: nil,
+                    configSourceId: nil,
+                    configSourceName: nil,
+                    configSourceIsBuiltin: nil
                 ),
                 SourceConfiguration(
                     id: "npm-huawei",
@@ -349,7 +358,10 @@ class ConfigurationLoader {
                     description: "华为云镜像",
                     region: "CN",
                     requiresAuth: nil,
-                    auth: nil
+                    auth: nil,
+                    configSourceId: nil,
+                    configSourceName: nil,
+                    configSourceIsBuiltin: nil
                 )
             ],
             strategy: .command(CommandStrategy(

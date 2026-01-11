@@ -104,6 +104,120 @@ class ConfigurationDrivenSourceManager {
         return toolsConfiguration?.tools ?? []
     }
 
+    // MARK: - 配置源分组工具获取
+
+    /// 获取按配置源分组的工具列表
+    /// - Returns: [(ConfigSource, [ToolConfiguration])] - 配置源与其包含的工具
+    func getToolsGroupedByConfigSource() -> [(ConfigSource, [ToolConfiguration])] {
+        var result: [(ConfigSource, [ToolConfiguration])] = []
+
+        // 获取启用的配置源
+        let enabledSources = ConfigSourceManager.shared.getEnabledSources()
+
+        // 为每个配置源加载独立的工具列表
+        for source in enabledSources {
+            if let tools = loadToolsFromConfigSource(source) {
+                result.append((source, tools))
+            }
+        }
+
+        return result
+    }
+
+    /// 获取指定配置源的工具列表
+    /// - Parameter configSourceId: 配置源 ID
+    /// - Returns: 该配置源包含的工具列表，如果未找到返回 nil
+    func getTools(forConfigSource configSourceId: UUID) -> [ToolConfiguration]? {
+        // 获取启用的配置源
+        let enabledSources = ConfigSourceManager.shared.getEnabledSources()
+
+        // 查找指定的配置源
+        guard let source = enabledSources.first(where: { $0.id == configSourceId }) else {
+            return nil
+        }
+
+        // 从该配置源加载工具（使用现有的私有方法）
+        return loadToolsFromConfigSource(source)
+    }
+
+    /// 从单个配置源加载工具列表（不去重）
+    /// - Parameter source: 配置源
+    /// - Returns: 工具配置列表
+    private func loadToolsFromConfigSource(_ source: ConfigSource) -> [ToolConfiguration]? {
+        // 根据配置源类型加载
+        switch source.type {
+        case .builtin:
+            // 内置配置：尝试从 Bundle 加载
+            if let config = loadBuiltinToolsConfig() {
+                return annotateToolsWithConfigSource(tools: config.tools, source: source)
+            }
+
+            // Bundle 加载失败，使用硬编码的最小化配置作为后备
+            debugLog("⚠️ Bundle 加载失败，使用硬编码的最小化内置配置（仅 npm）")
+            let fallbackConfig = configLoader.loadBuiltinConfiguration()
+            return annotateToolsWithConfigSource(tools: fallbackConfig.tools, source: source)
+
+        case .local:
+            // 本地文件：从文件路径加载
+            guard let path = source.url else { return nil }
+            let expandedPath = NSString(string: path).expandingTildeInPath
+
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: expandedPath)),
+                  let config = try? JSONDecoder().decode(ToolsConfiguration.self, from: data) else {
+                return nil
+            }
+
+            return annotateToolsWithConfigSource(tools: config.tools, source: source)
+
+        case .remote:
+            // 远程配置：暂时跳过（需要异步加载）
+            // TODO: 远程配置需要异步加载，这里暂时返回 nil
+            return nil
+        }
+
+        return nil
+    }
+
+    /// 为工具及其镜像源标记配置源信息
+    /// - Parameters:
+    ///   - tools: 工具配置列表
+    ///   - source: 配置源
+    /// - Returns: 标记后的工具配置列表
+    private func annotateToolsWithConfigSource(
+        tools: [ToolConfiguration],
+        source: ConfigSource
+    ) -> [ToolConfiguration] {
+        return tools.map { tool in
+            // 为每个镜像源添加配置源信息
+            let annotatedSources = tool.sources.map { sourceConfig in
+                sourceConfig.withConfigSource(
+                    configSourceId: source.id.uuidString,
+                    configSourceName: source.name,
+                    configSourceIsBuiltin: (source.type == .builtin)
+                )
+            }
+
+            // 创建带有新镜像源列表的工具副本
+            return tool.withSources(annotatedSources)
+        }
+    }
+
+    /// 加载内置配置的工具部分（单独方法）
+    /// - Returns: 工具配置
+    private func loadBuiltinToolsConfig() -> ToolsConfiguration? {
+        // 从 Bundle 中加载内置配置
+        // 注意：这里假设内置配置文件名为 npm_mirror.json
+        guard let url = Bundle.main.url(forResource: "npm_mirror", withExtension: "json", subdirectory: "configs"),
+              let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(ToolsConfiguration.self, from: data) else {
+            return nil
+        }
+
+        return config
+    }
+
+    // MARK: - 旧方法（向后兼容）
+
     /// 根据 ID 获取工具配置
     func getTool(by id: String) -> ToolConfiguration? {
         return cachedTools[id]

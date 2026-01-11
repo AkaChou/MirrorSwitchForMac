@@ -51,6 +51,21 @@ struct ToolConfiguration: Codable, Identifiable {
     let postActions: PostActions?
 
     var identifier: String { id }
+
+    /// 创建带有新镜像源列表的副本
+    func withSources(_ sources: [SourceConfiguration]) -> ToolConfiguration {
+        return ToolConfiguration(
+            id: self.id,
+            name: self.name,
+            description: self.description,
+            detection: self.detection,
+            sources: sources,
+            strategy: self.strategy,
+            backup: self.backup,
+            metadata: self.metadata,
+            postActions: self.postActions
+        )
+    }
 }
 
 /// 工具元数据
@@ -179,7 +194,38 @@ struct SourceConfiguration: Codable, Identifiable {
     /// 认证信息
     let auth: SourceAuth?
 
+    // MARK: - 配置源跟踪字段
+
+    /// 所属配置源 ID（用于跟踪镜像源来自哪个配置源）
+    let configSourceId: String?
+
+    /// 所属配置源名称（用于 UI 显示）
+    let configSourceName: String?
+
+    /// 是否来自内置配置（用于区分配置源类型）
+    let configSourceIsBuiltin: Bool?
+
     var identifier: String { id }
+
+    /// 创建带有配置源信息的副本
+    func withConfigSource(
+        configSourceId: String? = nil,
+        configSourceName: String? = nil,
+        configSourceIsBuiltin: Bool? = nil
+    ) -> SourceConfiguration {
+        return SourceConfiguration(
+            id: self.id,
+            name: self.name,
+            url: self.url,
+            description: self.description,
+            region: self.region,
+            requiresAuth: self.requiresAuth,
+            auth: self.auth,
+            configSourceId: configSourceId ?? self.configSourceId,
+            configSourceName: configSourceName ?? self.configSourceName,
+            configSourceIsBuiltin: configSourceIsBuiltin ?? self.configSourceIsBuiltin
+        )
+    }
 }
 
 /// 镜像源认证信息
