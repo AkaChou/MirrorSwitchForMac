@@ -140,10 +140,11 @@ class ConfigurationLoader {
             }
         }
 
-        // 2.5. 开发模式：尝试从项目目录加载配置
+        // 2.5. 开发模式：尝试从项目 configs/ 目录加载配置
         #if DEBUG
         let projectConfigPath = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
+            .appendingPathComponent("configs")
             .appendingPathComponent("tools_config.json")
 
         if FileManager.default.fileExists(atPath: projectConfigPath.path) {
@@ -165,15 +166,15 @@ class ConfigurationLoader {
                         "user": "project",
                         "tools_count": merged.tools.count
                     ])
-                    print("✓ 已从项目目录加载配置，共 \(merged.tools.count) 个工具")
+                    print("✓ 已从 configs/ 目录加载配置，共 \(merged.tools.count) 个工具")
                     return merged
                 } else {
                     auditLog("CONFIG_LOADED", info: ["source": "project", "tools_count": projectConfig.tools.count])
-                    print("✓ 已从项目目录加载配置，共 \(projectConfig.tools.count) 个工具")
+                    print("✓ 已从 configs/ 目录加载配置，共 \(projectConfig.tools.count) 个工具")
                     return projectConfig
                 }
             } catch {
-                print("⚠️ 项目配置加载失败: \(error.localizedDescription)")
+                print("⚠️ configs/ 目录配置加载失败: \(error.localizedDescription)")
             }
         }
         #endif
