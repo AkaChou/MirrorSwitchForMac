@@ -32,6 +32,13 @@ class BackupManager {
         return backupRoot.appendingPathComponent(tool.rawValue.lowercased())
     }
 
+    /// 获取指定工具 ID 的备份目录（支持动态工具）
+    /// - Parameter toolId: 工具 ID（如 "maven", "npm"）
+    /// - Returns: 备份目录 URL
+    func backupDirectory(for toolId: String) -> URL {
+        return backupRoot.appendingPathComponent(toolId.lowercased())
+    }
+
     /// 检查是否首次运行，如果是则执行备份
     func backupIfNeeded() async {
         // 检查是否首次运行

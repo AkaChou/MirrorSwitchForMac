@@ -380,7 +380,8 @@ class ConfigurationLoader {
                 supportsSpeedTest: true,
                 dependencies: nil,
                 documentationURL: "https://docs.npmjs.com/"
-            )
+            ),
+            postActions: nil
         )
 
         return [npm]
