@@ -427,19 +427,13 @@
         "filePath": "~/.orbstack/config/docker.json",
         "set": {
           "jsonpath": "registry-mirrors",
-          "value": {
-            "type": "array",
-            "items": [
-              {
-                "type": "string",
-                "value": "{{url}}"
-              }
-            ]
-          },
+          "value": [
+            "{{url}}"
+          ],
           "ensureStructure": {
             "createIfMissing": true,
             "createParentDirectories": true,
-            "defaultStructure": "{\"registry-mirrors\":[\"{{url}}\"]}"
+            "defaultStructure": "{\"registry-mirrors\":[]}"
           }
         },
         "get": {
