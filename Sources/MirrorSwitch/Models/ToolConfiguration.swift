@@ -47,6 +47,9 @@ struct ToolConfiguration: Codable, Identifiable {
     /// 工具元数据
     let metadata: ToolMetadata?
 
+    /// 后置动作配置
+    let postActions: PostActions?
+
     var identifier: String { id }
 }
 
@@ -257,6 +260,32 @@ enum StrategyConfiguration: Codable {
         case .keyvalue(let strategy):
             try container.encode("keyvalue", forKey: .type)
             try strategy.encode(to: encoder)
+        }
+    }
+}
+
+// MARK: - StrategyConfiguration Extensions
+
+extension StrategyConfiguration {
+    /// 获取配置文件目录
+    /// - Returns: 配置文件目录路径，如果无法确定则返回 nil
+    var configDirectory: String? {
+        switch self {
+        case .xml(let strategy):
+            // XML 策略：从配置文件路径中提取目录
+            return (strategy.filePath as NSString).deletingLastPathComponent
+        case .jsonpath(let strategy):
+            // JSONPath 策略：从配置文件路径中提取目录
+            return (strategy.filePath as NSString).deletingLastPathComponent
+        case .regex(let strategy):
+            // Regex 策略：从配置文件路径中提取目录
+            return (strategy.filePath as NSString).deletingLastPathComponent
+        case .keyvalue(let strategy):
+            // KeyValue 策略：从配置文件路径中提取目录
+            return (strategy.filePath as NSString).deletingLastPathComponent
+        case .command:
+            // Command 策略：通常不涉及配置文件
+            return nil
         }
     }
 }
@@ -637,6 +666,60 @@ struct TemplateVariableParser {
 
         return variables
     }
+}
+
+// MARK: - 后置动作配置
+
+/// 后置动作配置容器
+struct PostActions: Codable {
+    /// 切换镜像源后的后置动作
+    let onSourceChanged: PostAction?
+
+    /// 重置为默认配置后的后置动作
+    let onReset: PostAction?
+}
+
+/// 后置动作配置
+struct PostAction: Codable {
+    /// 动作类型
+    let type: PostActionType
+
+    /// 标题
+    let title: String
+
+    /// 消息内容
+    let message: String
+
+    /// 确认按钮文本
+    let confirmButton: String?
+
+    /// 取消按钮文本
+    let cancelButton: String?
+
+    /// 确认后执行的命令
+    let confirmCommand: CommandConfig?
+
+    /// 取消后执行的命令
+    let cancelCommand: CommandConfig?
+}
+
+/// 后置动作类型
+enum PostActionType: String, Codable {
+    case showConfirmationDialog = "showConfirmationDialog"  // 显示确认对话框
+    case executeCommand = "executeCommand"                  // 执行命令
+    case notification = "notification"                      // 显示通知
+}
+
+/// 命令配置
+struct CommandConfig: Codable {
+    /// 命令路径
+    let command: String
+
+    /// 参数列表
+    let arguments: [String]?
+
+    /// 工作目录
+    let workingDirectory: String?
 }
 
 // MARK: - 配置错误

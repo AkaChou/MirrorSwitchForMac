@@ -27,14 +27,36 @@ struct MirrorSource: Codable, Identifiable, Equatable {
     /// 是否为当前选中的镜像源
     var isSelected: Bool
 
+    /// 所属配置源 ID
+    var configSourceId: String?
+
+    /// 所属配置源名称
+    var configSourceName: String?
+
+    /// 是否在 UI 中可见
+    var isVisible: Bool
+
     /// 初始化方法
-    init(id: String, name: String, url: String, description: String? = nil, pingTime: Int? = nil, isSelected: Bool = false) {
+    init(
+        id: String,
+        name: String,
+        url: String,
+        description: String? = nil,
+        pingTime: Int? = nil,
+        isSelected: Bool = false,
+        configSourceId: String? = nil,
+        configSourceName: String? = nil,
+        isVisible: Bool = true
+    ) {
         self.id = id
         self.name = name
         self.url = url
         self.description = description
         self.pingTime = pingTime
         self.isSelected = isSelected
+        self.configSourceId = configSourceId
+        self.configSourceName = configSourceName
+        self.isVisible = isVisible
     }
 }
 
