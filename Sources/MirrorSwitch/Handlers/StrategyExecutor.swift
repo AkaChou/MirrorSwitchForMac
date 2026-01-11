@@ -242,7 +242,13 @@ actor StrategyExecutor {
 
         // 写回文件
         let newData = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
-        try newData.write(to: URL(fileURLWithPath: filePath))
+        var jsonString = String(data: newData, encoding: .utf8) ?? ""
+
+        // 修复 JSONSerialization 对正斜杠的错误转义
+        // JSONSerializer 会将 "https://" 转义为 "https:\/\/"，这是不必要的
+        jsonString = jsonString.replacingOccurrences(of: "\\/", with: "/")
+
+        try jsonString.write(toFile: filePath, atomically: true, encoding: .utf8)
     }
 
     private func getJSONPathConfig(
