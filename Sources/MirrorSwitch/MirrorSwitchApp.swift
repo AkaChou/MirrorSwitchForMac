@@ -264,6 +264,9 @@ class MenuUpdateHelper: NSObject {
             menuItem.submenu = submenu
         }
 
+        // 添加分隔线
+        menu.addItem(NSMenuItem.separator())
+
         // 配置菜单项
         let configMenuItem = createConfigMenuItem()
         menu.addItem(configMenuItem)
@@ -1030,12 +1033,13 @@ class MenuUpdateHelper: NSObject {
             arrowTextField.isHidden = true
         }
 
+        // 设置点击回调
+        configItemView.onAction = { [weak self] in
+            self?.openConfigWindow()
+        }
+
         let menuItem = NSMenuItem()
         menuItem.view = configItemView
-
-        // 设置点击事件
-        menuItem.target = self
-        menuItem.action = #selector(openConfigWindow)
 
         return menuItem
     }
@@ -1801,6 +1805,9 @@ class MenuItemView: NSView {
     private let version: String?
     private let sourceName: String
 
+    /// 点击回调（用于配置菜单项等不需要子菜单的项）
+    var onAction: (() -> Void)?
+
     init(frame frameRect: NSRect, toolName: String, version: String?, sourceName: String) {
         self.toolName = toolName
         self.version = version
@@ -1923,5 +1930,12 @@ class MenuItemView: NSView {
             userInfo: nil
         )
         addTrackingArea(trackingArea)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        // 如果有点击回调，执行回调
+        if let action = onAction {
+            action()
+        }
     }
 }

@@ -182,25 +182,6 @@ actor AppConfigurationLoader {
         }
     }
 
-    /// 从用户目录加载应用配置（覆盖内置配置）
-    func loadUserAppConfiguration() throws -> AppConfiguration {
-        let userConfigURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".mirror-switch")
-            .appendingPathComponent("app_config.json")
-
-        guard FileManager.default.fileExists(atPath: userConfigURL.path) else {
-            throw ConfigError.fileNotFound(userConfigURL.path)
-        }
-
-        let data = try Data(contentsOf: userConfigURL)
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-        let config = try decoder.decode(AppConfiguration.self, from: data)
-        print("✅ 用户应用配置加载成功")
-        return config
-    }
-
     /// 从远程加载应用配置（带缓存和 ETag 支持）
     /// - Parameters:
     ///   - useCache: 是否使用缓存（默认 true）
@@ -338,13 +319,13 @@ actor AppConfigurationLoader {
         print("🗑️ 配置缓存已清除")
     }
 
-    /// 重新加载所有配置（支持远程、用户本地、内置配置的优先级）
+    /// 重新加载所有配置（支持远程、内置配置的优先级）
+    /// 注意：app_config.json 只从 Bundle 或远程加载，不从用户目录加载
     /// - Parameters:
     ///   - useRemote: 是否尝试加载远程配置（默认 true）
-    ///   - useUserConfig: 是否尝试加载用户配置（默认 true）
     ///   - cacheExpiry: 缓存过期时间（秒）
     /// - Returns: (应用配置, UI 字符串配置)
-    func reload(useRemote: Bool = true, useUserConfig: Bool = true, cacheExpiry: Int = 3600) async throws -> (appConfig: AppConfiguration, uiStrings: UIStringsConfiguration) {
+    func reload(useRemote: Bool = true, cacheExpiry: Int = 3600) async throws -> (appConfig: AppConfiguration, uiStrings: UIStringsConfiguration) {
         clearCache()
 
         var finalConfig: AppConfiguration?
@@ -354,51 +335,26 @@ actor AppConfigurationLoader {
             do {
                 let remoteConfig = try await loadRemoteAppConfiguration(useCache: true, cacheExpiry: cacheExpiry)
                 finalConfig = remoteConfig
-                print("📡 已使用远程配置")
+                print("📡 已使用远程 app_config")
             } catch {
                 print("⚠️ 远程配置加载失败: \(error.localizedDescription)")
             }
         }
 
-        // 2. 尝试加载用户本地配置（覆盖/扩展）
-        if useUserConfig {
-            do {
-                let userConfig = try loadUserAppConfiguration()
-
-                if let base = finalConfig {
-                    // 合并配置：用户配置可以覆盖部分设置
-                    finalConfig = mergeConfigurations(base: base, user: userConfig)
-                    print("👤 已合并用户本地配置")
-                } else {
-                    finalConfig = userConfig
-                    print("👤 已使用用户本地配置")
-                }
-            } catch {
-                print("⚠️ 用户配置加载失败: \(error.localizedDescription)")
-            }
-        }
-
-        // 3. 使用内置默认配置（最低优先级）
+        // 2. 使用内置默认配置（从 Bundle 加载）
         if finalConfig == nil {
             finalConfig = try loadAppConfiguration()
-            print("📦 已使用内置默认配置")
+            print("📦 已使用内置 app_config（从 Bundle）")
         }
 
         guard let config = finalConfig else {
-            throw ConfigError.fileNotFound("无法加载任何配置")
+            throw ConfigError.fileNotFound("无法加载 app_config")
         }
 
         appConfig = config
         let strings = try loadUIStrings()
 
         return (config, strings)
-    }
-
-    /// 合并配置（用户配置覆盖基础配置）
-    private func mergeConfigurations(base: AppConfiguration, user: AppConfiguration) -> AppConfiguration {
-        // 简单实现：使用用户配置覆盖基础配置
-        // 实际应用中可以根据需要进行更精细的合并
-        return user
     }
 
     // MARK: - 字符串格式化
