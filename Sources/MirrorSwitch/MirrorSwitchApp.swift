@@ -205,12 +205,22 @@ class MenuUpdateHelper: NSObject {
 
     /// 设置通知监听
     private func setupNotificationObserver() {
+        // 监听配置源变更（需要重新加载配置）
         observer = NotificationCenter.default.addObserver(
             forName: .configSourcesDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             self?.handleConfigSourcesChange()
+        }
+
+        // 监听工具可见性变更（只需刷新菜单，不需要重新加载配置）
+        NotificationCenter.default.addObserver(
+            forName: .toolVisibilityDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleToolVisibilityChange()
         }
     }
 
@@ -219,6 +229,14 @@ class MenuUpdateHelper: NSObject {
         debouncer.debounce { [weak self] in
             self?.performConfigReload()
         }
+    }
+
+    /// 处理工具可见性变更（轻量级，只刷新菜单）
+    private func handleToolVisibilityChange() {
+        debugLog("📣 收到工具可见性变更通知，仅刷新菜单...")
+        // 立即刷新菜单，不需要防抖（可见性变更通常是用户操作，需要立即响应）
+        refreshMenu()
+        debugLog("✅ 菜单已刷新（工具可见性变更）")
     }
 
     /// 执行配置重新加载

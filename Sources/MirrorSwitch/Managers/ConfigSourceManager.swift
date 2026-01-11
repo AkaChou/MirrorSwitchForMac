@@ -268,8 +268,8 @@ class ConfigSourceManager {
 
         print("✅ 已设置工具可见性: \(toolId) -> \(isVisible)")
 
-        // 发送通知
-        NotificationCenter.default.post(name: .configSourcesDidChange, object: nil)
+        // 发送工具可见性变更通知（仅刷新菜单，不重新加载配置）
+        NotificationCenter.default.post(name: .toolVisibilityDidChange, object: nil)
     }
 
     /// 获取配置源的工具可见性设置
@@ -309,8 +309,8 @@ class ConfigSourceManager {
 
         print("✅ 已批量设置工具可见性")
 
-        // 发送通知
-        NotificationCenter.default.post(name: .configSourcesDidChange, object: nil)
+        // 发送工具可见性变更通知（仅刷新菜单，不重新加载配置）
+        NotificationCenter.default.post(name: .toolVisibilityDidChange, object: nil)
     }
 
     /// 检查工具是否应该在一级菜单中显示

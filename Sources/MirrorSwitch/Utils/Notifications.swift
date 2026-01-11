@@ -14,6 +14,10 @@ extension Notification.Name {
     /// 当添加、删除或切换配置源的启用状态时发送此通知
     static let configSourcesDidChange = Notification.Name("configSourcesDidChange")
 
+    /// 工具可见性已变更
+    /// 当工具的可见性设置发生变化时发送此通知（仅影响菜单显示，不需要重新加载配置）
+    static let toolVisibilityDidChange = Notification.Name("toolVisibilityDidChange")
+
     /// 工具配置已重新加载
     /// 当工具配置重新加载完成时发送此通知
     static let toolsConfigurationDidReload = Notification.Name("toolsConfigurationDidReload")
