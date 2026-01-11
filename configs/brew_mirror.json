@@ -33,6 +33,20 @@
           "region": "CN"
         },
         {
+          "id": "brew-sjtu",
+          "name": "上海交大 SJTUG",
+          "url": "https://mirrors.sjtug.sjtu.edu.cn/homebrew-bottles/bottles",
+          "description": "上海交通大学镜像",
+          "region": "CN"
+        },
+        {
+          "id": "brew-zju",
+          "name": "浙江大学 ZJU",
+          "url": "https://mirrors.zju.edu.cn/homebrew-bottles/bottles",
+          "description": "浙江大学镜像",
+          "region": "CN"
+        },
+        {
           "id": "brew-aliyun",
           "name": "阿里云",
           "url": "https://mirrors.aliyun.com/homebrew/homebrew-bottles/bottles",
@@ -44,6 +58,13 @@
           "name": "腾讯云",
           "url": "https://mirrors.cloud.tencent.com/homebrew-bottles/bottles",
           "description": "腾讯云镜像",
+          "region": "CN"
+        },
+        {
+          "id": "brew-163",
+          "name": "网易163",
+          "url": "https://mirrors.163.com/homebrew/homebrew-bottles/bottles",
+          "description": "网易163镜像",
           "region": "CN"
         }
       ],
