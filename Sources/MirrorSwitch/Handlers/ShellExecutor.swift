@@ -21,6 +21,22 @@ struct ShellExecutionResult {
 
 /// Shell 命令执行器（静态方法类）
 class ShellExecutor {
+    /// 路径解析器（共享实例）
+    private static let pathResolver = PathResolver()
+
+    /// 解析命令路径
+    /// - Parameter command: 命令名称或路径
+    /// - Returns: 解析后的绝对路径
+    private static func resolveCommandPath(_ command: String) -> String {
+        // 如果已经是绝对路径，直接返回
+        if (command as NSString).isAbsolutePath {
+            return command
+        }
+
+        // 否则尝试通过 PathResolver 解析
+        return pathResolver.findExecutable(command) ?? command
+    }
+
     /// 执行 Shell 命令
     /// - Parameters:
     ///   - command: 命令路径
@@ -29,7 +45,8 @@ class ShellExecutor {
     /// - Throws: 执行失败时抛出错误
     static func execute(_ command: String, arguments: [String]) async throws -> ShellExecutionResult {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: command)
+        let resolvedCommand = resolveCommandPath(command)
+        process.executableURL = URL(fileURLWithPath: resolvedCommand)
         process.arguments = arguments
 
         let outputPipe = Pipe()
@@ -65,7 +82,8 @@ class ShellExecutor {
     /// - Throws: 执行失败时抛出错误
     static func executeSync(_ command: String, arguments: [String]) throws -> ShellExecutionResult {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: command)
+        let resolvedCommand = resolveCommandPath(command)
+        process.executableURL = URL(fileURLWithPath: resolvedCommand)
         process.arguments = arguments
 
         let outputPipe = Pipe()

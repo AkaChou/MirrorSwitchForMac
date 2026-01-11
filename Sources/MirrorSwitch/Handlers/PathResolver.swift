@@ -8,7 +8,7 @@
 import Foundation
 
 /// 路径解析器
-class PathResolver {
+class PathResolver: @unchecked Sendable {
     /// 查找可执行文件路径
     /// - Parameter name: 可执行文件名称
     /// - Returns: 可执行文件的完整路径，如果未找到则返回 nil
