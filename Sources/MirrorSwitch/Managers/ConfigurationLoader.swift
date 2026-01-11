@@ -39,15 +39,6 @@ class ConfigurationLoader {
 
     // MARK: - 配置
 
-    /// 远程配置 URL（可通过环境变量配置）
-    private var remoteConfigURL: URL? {
-        if let urlString = ProcessInfo.processInfo.environment["MIRROR_SWITCH_CONFIG_URL"],
-           let url = URL(string: urlString) {
-            return url
-        }
-        return nil
-    }
-
     /// 缓存过期时间（秒），默认 1 小时
     private let cacheExpiry: TimeInterval = 3600
 
@@ -75,119 +66,118 @@ class ConfigurationLoader {
 
         // 确保目录存在
         createDirectoriesIfNeeded()
+
+        // 检查环境变量，如果设置了远程配置 URL，自动添加到 ConfigSourceManager
+        checkAndImportEnvConfig()
+    }
+
+    /// 检查环境变量并导入远程配置
+    private func checkAndImportEnvConfig() {
+        guard let urlString = ProcessInfo.processInfo.environment["MIRROR_SWITCH_CONFIG_URL"],
+              URL(string: urlString) != nil else {
+            return
+        }
+
+        // 检查是否已存在相同的远程配置
+        let sources = ConfigSourceManager.shared.getAllSources()
+        let alreadyExists = sources.contains { $0.type == .remote && $0.url == urlString }
+
+        if !alreadyExists {
+            let envConfig = ConfigSource(
+                name: "环境变量配置",
+                type: .remote,
+                url: urlString,
+                isEnabled: true
+            )
+            ConfigSourceManager.shared.addConfigSource(envConfig)
+            print("✓ 已从环境变量导入远程配置: \(urlString)")
+        }
     }
 
     // MARK: - 公共方法
 
-    /// 加载配置（合并策略）
+    /// 加载配置（从 ConfigSourceManager 获取配置源）
     func loadConfiguration() async throws -> ToolsConfiguration {
-        auditLog("CONFIG_LOAD_START", info: ["remoteURL": remoteConfigURL?.absoluteString ?? "none"])
+        auditLog("CONFIG_LOAD_START", info: ["mode": "multi-source"])
 
-        var baseConfig: ToolsConfiguration?
-        var configSource = "builtin"
+        var mergedConfig: ToolsConfiguration?
 
-        // 1. 尝试加载远程配置（带缓存和验证）
-        if let remoteURL = remoteConfigURL {
+        // 从 ConfigSourceManager 获取启用的配置源
+        let enabledSources = ConfigSourceManager.shared.getEnabledSources()
+
+        print("📋 已启用 \(enabledSources.count) 个配置源")
+
+        // 按顺序加载每个配置源
+        for source in enabledSources {
             do {
-                baseConfig = try await loadRemoteConfiguration(from: remoteURL)
-                configSource = "remote"
+                let config = try await loadConfig(from: source)
+
+                if let existing = mergedConfig {
+                    // 合并配置
+                    mergedConfig = mergeConfigurations(base: existing, user: config)
+                    print("✓ 已加载配置: \(source.name) (合并)")
+                } else {
+                    // 第一个配置
+                    mergedConfig = config
+                    print("✓ 已加载配置: \(source.name)")
+                }
+
                 auditLog("CONFIG_LOADED", info: [
-                    "source": "remote",
-                    "url": remoteURL.absoluteString,
-                    "status": "success"
+                    "source": source.name,
+                    "type": source.type.rawValue,
+                    "tools_count": config.tools.count
                 ])
-                print("✓ 已加载远程配置")
             } catch {
                 auditLog("CONFIG_LOAD_FAILED", info: [
-                    "source": "remote",
-                    "url": remoteURL.absoluteString,
+                    "source": source.name,
+                    "type": source.type.rawValue,
                     "error": error.localizedDescription
                 ])
-                print("⚠️ 远程配置加载失败，尝试使用缓存或本地配置: \(error)")
+                print("⚠️ 配置加载失败: \(source.name) - \(error.localizedDescription)")
 
-                // 尝试使用缓存
-                if enableCache, let cached = loadFromCache() {
-                    baseConfig = cached.config
-                    configSource = "cache"
-                    print("✓ 已使用缓存配置")
+                // 更新配置源状态为错误
+                if source.type != .builtin {
+                    ConfigSourceManager.shared.updateConfigSourceStatus(id: source.id, status: .error)
                 }
             }
         }
 
-        // 2. 加载用户本地配置（覆盖/扩展）
-        if FileManager.default.fileExists(atPath: userConfigPath.path) {
-            do {
-                let userConfig = try loadLocalConfiguration(from: userConfigPath)
+        // 如果没有任何配置源成功加载，使用内置配置
+        guard let finalConfig = mergedConfig else {
+            print("⚠️ 所有配置源加载失败，使用内置配置")
+            let builtinConfig = loadBuiltinConfiguration()
+            auditLog("CONFIG_LOADED", info: ["source": "builtin_fallback", "tools_count": builtinConfig.tools.count])
+            return builtinConfig
+        }
 
-                if let base = baseConfig {
-                    // 合并配置
-                    let merged = mergeConfigurations(base: base, user: userConfig)
-                    auditLog("CONFIG_MERGED", info: [
-                        "base": configSource,
-                        "user": "local",
-                        "tools_count": merged.tools.count
-                    ])
-                    print("✓ 已合并配置，共 \(merged.tools.count) 个工具")
-                    return merged
-                } else {
-                    auditLog("CONFIG_LOADED", info: ["source": "local", "tools_count": userConfig.tools.count])
-                    print("✓ 已加载本地配置，共 \(userConfig.tools.count) 个工具")
-                    return userConfig
-                }
-            } catch {
-                auditLog("CONFIG_LOAD_FAILED", info: ["source": "local", "error": error.localizedDescription])
-                print("⚠️ 本地配置加载失败: \(error)")
+        print("✓ 配置加载完成，共 \(finalConfig.tools.count) 个工具")
+        return finalConfig
+    }
+
+    /// 从单个配置源加载配置
+    private func loadConfig(from source: ConfigSource) async throws -> ToolsConfiguration {
+        switch source.type {
+        case .builtin:
+            return loadBuiltinConfiguration()
+
+        case .local:
+            guard let path = source.url else {
+                throw ConfigurationError.fileNotFound("本地配置路径为空")
             }
-        }
+            // 展开波浪号
+            let expandedPath = NSString(string: path).expandingTildeInPath
+            let url = URL(fileURLWithPath: expandedPath)
+            return try loadLocalConfiguration(from: url)
 
-        // 2.5. 开发模式：尝试从项目 configs/ 目录加载配置
-        #if DEBUG
-        let projectConfigPath = URL(fileURLWithPath: #file)
-            .deletingLastPathComponent()
-            .appendingPathComponent("configs")
-            .appendingPathComponent("npm_mirror.json")
-
-        if FileManager.default.fileExists(atPath: projectConfigPath.path) {
-            do {
-                let projectConfig = try loadLocalConfiguration(from: projectConfigPath)
-
-                // 保存到用户目录，方便以后修改
-                try? FileManager.default.createDirectory(at: configDirectory, withIntermediateDirectories: true)
-                if !FileManager.default.fileExists(atPath: userConfigPath.path) {
-                    try? FileManager.default.copyItem(at: projectConfigPath, to: userConfigPath)
-                    print("✓ 已将项目配置复制到用户目录")
-                }
-
-                if let base = baseConfig {
-                    // 合并配置
-                    let merged = mergeConfigurations(base: base, user: projectConfig)
-                    auditLog("CONFIG_MERGED", info: [
-                        "base": configSource,
-                        "user": "project",
-                        "tools_count": merged.tools.count
-                    ])
-                    print("✓ 已从 configs/ 目录加载配置，共 \(merged.tools.count) 个工具")
-                    return merged
-                } else {
-                    auditLog("CONFIG_LOADED", info: ["source": "project", "tools_count": projectConfig.tools.count])
-                    print("✓ 已从 configs/ 目录加载配置，共 \(projectConfig.tools.count) 个工具")
-                    return projectConfig
-                }
-            } catch {
-                print("⚠️ configs/ 目录配置加载失败: \(error.localizedDescription)")
+        case .remote:
+            guard let urlString = source.url else {
+                throw ConfigurationError.fileNotFound("远程配置 URL 为空")
             }
+            guard let url = URL(string: urlString) else {
+                throw ConfigurationError.networkError(URLError(.badURL))
+            }
+            return try await loadRemoteConfiguration(from: url)
         }
-        #endif
-
-        // 3. 使用内置默认配置
-        if let base = baseConfig {
-            return base
-        }
-
-        let builtinConfig = loadBuiltinConfiguration()
-        auditLog("CONFIG_LOADED", info: ["source": "builtin", "tools_count": builtinConfig.tools.count])
-        print("✓ 已加载内置默认配置")
-        return builtinConfig
     }
 
     /// 保存用户配置
@@ -207,15 +197,19 @@ class ConfigurationLoader {
         print("✓ 用户配置已保存")
     }
 
-    /// 重新加载远程配置
-    func reloadRemoteConfiguration() async throws {
-        guard let remoteURL = remoteConfigURL else {
-            throw ConfigurationError.networkError(URLError(.badURL))
+    /// 重新加载配置（刷新所有配置源）
+    func reloadConfiguration() async throws {
+        // 重新加载所有配置源
+        _ = try await loadConfiguration()
+
+        // 验证所有远程和本地配置源
+        let sources = ConfigSourceManager.shared.getAllSources()
+        for source in sources where source.type != .builtin {
+            _ = await ConfigSourceManager.shared.validateConfigSource(source)
         }
 
-        _ = try await loadRemoteConfiguration(from: remoteURL, skipCache: true)
-        auditLog("CONFIG_RELOADED", info: ["url": remoteURL.absoluteString])
-        print("✓ 远程配置已重新加载")
+        auditLog("CONFIG_RELOADED", info: ["sources_count": sources.count])
+        print("✓ 配置已重新加载")
     }
 
     // MARK: - 远程配置加载
