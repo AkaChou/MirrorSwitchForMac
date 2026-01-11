@@ -101,4 +101,11 @@ class NPMHandler: ToolHandlerProtocol {
         try FileManager.default.copyItem(at: backupPath, to: npmrcPath)
         print("✓ NPM 配置已恢复")
     }
+
+    /// 获取配置文件目录
+    func getConfigDirectory() -> URL? {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        // .npmrc 在用户主目录下，返回主目录
+        return FileManager.default.fileExists(atPath: homeDir.path) ? homeDir : nil
+    }
 }

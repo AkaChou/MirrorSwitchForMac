@@ -38,19 +38,19 @@ struct AppConfiguration: Codable {
                 id: "npm-taobao",
                 name: "淘宝源",
                 url: "https://registry.npmmirror.com/",
-                description: "淘宝镜像（新域名）"
+                description: "淘宝镜像（npmmirror，阿里巴巴赞助）"
             ),
             MirrorSource(
                 id: "npm-tencent",
-                name: "腾讯源",
+                name: "腾讯云",
                 url: "https://mirrors.cloud.tencent.com/npm/",
                 description: "腾讯云镜像"
             ),
             MirrorSource(
-                id: "npm-tsinghua",
-                name: "清华源",
-                url: "https://registry.npmmirror.com/",
-                description: "清华大学镜像"
+                id: "npm-huawei",
+                name: "华为云",
+                url: "https://mirrors.huaweicloud.com/repository/npm/",
+                description: "华为云镜像"
             ),
         ]
 
@@ -70,8 +70,20 @@ struct AppConfiguration: Codable {
             MirrorSource(
                 id: "maven-tencent",
                 name: "腾讯云",
-                url: "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/",
+                url: "https://mirrors.cloud.tencent.com/repository/maven/",
                 description: "腾讯云公共仓库"
+            ),
+            MirrorSource(
+                id: "maven-huawei",
+                name: "华为云",
+                url: "https://mirrors.huaweicloud.com/repository/maven/",
+                description: "华为云 Maven 镜像"
+            ),
+            MirrorSource(
+                id: "maven-tsinghua",
+                name: "清华源",
+                url: "https://mirrors.tuna.tsinghua.edu.cn/maven/",
+                description: "清华大学镜像"
             ),
         ]
 
@@ -98,8 +110,8 @@ struct AppConfiguration: Codable {
 
         let orbstackSources = [
             MirrorSource(
-                id: "orbstack-default",
-                name: "默认",
+                id: "orbstack-official",
+                name: "官方源",
                 url: "https://docker.io",
                 description: "Docker Hub 官方"
             ),
@@ -107,8 +119,14 @@ struct AppConfiguration: Codable {
                 id: "orbstack-aliyun",
                 name: "阿里云",
                 url: "https://registry.cn-hangzhou.aliyuncs.com",
-                description: "阿里云容器镜像"
+                description: "阿里云容器镜像（仅阿里云内网推荐）"
             ),
+            MirrorSource(
+                id: "orbstack-tencent",
+                name: "腾讯云",
+                url: "https://mirror.ccs.tencentyun.com",
+                description: "腾讯云容器镜像（仅腾讯云内网推荐）"
+            )
         ]
 
         return AppConfiguration(

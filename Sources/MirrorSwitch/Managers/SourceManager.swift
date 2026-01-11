@@ -120,9 +120,38 @@ class SourceManager {
         }
 
         try await handler.restoreBackup()
+
+        // 恢复后重新检测当前使用的镜像源
+        await detectCurrentSource(for: tool)
     }
 
     // MARK: - Private Methods
+
+    /// 检测指定工具当前实际使用的镜像源
+    private func detectCurrentSource(for tool: ToolType) async {
+        do {
+            let currentConfig = try await getCurrentConfig(for: tool)
+
+            // 查找匹配的镜像源
+            if let matchingSource = findMatchingSource(for: tool, currentConfig: currentConfig) {
+                // 更新选中状态
+                updateSelectionState(tool: tool, sourceId: matchingSource.id)
+
+                // 保存选中状态到文件
+                configManager.saveCurrentSelection(tool: tool, sourceId: matchingSource.id)
+
+                print("✓ 检测到 \(tool.displayName) 当前使用: \(matchingSource.name)")
+            } else {
+                // 没有找到匹配的镜像源，清除所有选中状态
+                clearSelectionState(tool: tool)
+                // 清除保存的选中状态
+                configManager.clearCurrentSelection(tool: tool)
+                print("✓ \(tool.displayName) 未配置或无法识别当前配置")
+            }
+        } catch {
+            print("⚠️ 无法检测 \(tool.displayName) 当前配置: \(error.localizedDescription)")
+        }
+    }
 
     /// 加载当前选中状态
     private func loadCurrentSelection() {
@@ -136,22 +165,7 @@ class SourceManager {
     /// 检测当前实际使用的镜像源
     private func detectCurrentSources() async {
         for tool in ToolType.allCases {
-            do {
-                let currentConfig = try await getCurrentConfig(for: tool)
-
-                // 查找匹配的镜像源
-                if let matchingSource = findMatchingSource(for: tool, currentConfig: currentConfig) {
-                    // 更新选中状态
-                    updateSelectionState(tool: tool, sourceId: matchingSource.id)
-
-                    // 保存选中状态到文件
-                    configManager.saveCurrentSelection(tool: tool, sourceId: matchingSource.id)
-
-                    print("✓ 检测到 \(tool.displayName) 当前使用: \(matchingSource.name)")
-                }
-            } catch {
-                print("⚠️ 无法检测 \(tool.displayName) 当前配置: \(error.localizedDescription)")
-            }
+            await detectCurrentSource(for: tool)
         }
     }
 
@@ -189,6 +203,16 @@ class SourceManager {
         if var sources = config.tools[tool] {
             for index in sources.indices {
                 sources[index].isSelected = (sources[index].id == sourceId)
+            }
+            config.tools[tool] = sources
+        }
+    }
+
+    /// 清除选中状态
+    private func clearSelectionState(tool: ToolType) {
+        if var sources = config.tools[tool] {
+            for index in sources.indices {
+                sources[index].isSelected = false
             }
             config.tools[tool] = sources
         }

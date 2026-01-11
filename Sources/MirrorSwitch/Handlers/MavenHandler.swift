@@ -10,7 +10,10 @@ import Foundation
 /// Maven 镜像源处理器
 class MavenHandler: ToolHandlerProtocol {
     /// Maven settings.xml 路径
-    private let mavenSettingsPath: URL
+    private var mavenSettingsPath: URL
+
+    /// 原始配置文件备份标记
+    private static let originalBackupFlag = "original_settings_backipped"
 
     /// 初始化
     init() {
@@ -20,19 +23,97 @@ class MavenHandler: ToolHandlerProtocol {
             .appendingPathComponent("settings.xml")
     }
 
+    /// 获取实际的配置文件路径
+    /// 优先级：用户自定义路径下的 conf/settings.xml > ~/.m2/settings.xml
+    private func getConfigPath() -> URL {
+        // 检查是否有用户自定义的 Maven 路径
+        if let customPath = ConfigManager.shared.getCustomPath(for: .maven) {
+            let customSettingsPath = URL(fileURLWithPath: customPath)
+                .appendingPathComponent("conf")
+                .appendingPathComponent("settings.xml")
+
+            // 如果自定义路径下的配置文件存在，使用它
+            if FileManager.default.fileExists(atPath: customSettingsPath.path) {
+                debugLog("✅ 使用自定义路径的配置文件: \(customSettingsPath.path)")
+                return customSettingsPath
+            }
+        }
+
+        // 否则使用默认的 ~/.m2/settings.xml
+        return mavenSettingsPath
+    }
+
+    /// 获取原始配置备份路径
+    private func getOriginalBackupPath() -> URL {
+        let backupDir = BackupManager.shared.backupDirectory(for: .maven)
+        return backupDir.appendingPathComponent("settings.xml.original")
+    }
+
+    /// 检查是否已备份原始配置
+    private func hasOriginalBackup() -> Bool {
+        let flagPath = getOriginalBackupPath().deletingLastPathComponent()
+            .appendingPathComponent(Self.originalBackupFlag)
+        return FileManager.default.fileExists(atPath: flagPath.path)
+    }
+
+    /// 标记原始配置已备份
+    private func markOriginalBackup() {
+        let flagPath = getOriginalBackupPath().deletingLastPathComponent()
+            .appendingPathComponent(Self.originalBackupFlag)
+        FileManager.default.createFile(atPath: flagPath.path, contents: Data())
+    }
+
+    /// 备份原始配置文件（仅在用户首次指定路径时调用）
+    func backupOriginalSettings() async throws {
+        // 如果已经备份过，跳过
+        if hasOriginalBackup() {
+            debugLog("ℹ️ 原始配置已备份，跳过")
+            return
+        }
+
+        let configPath = getConfigPath()
+
+        // 检查配置文件是否存在
+        guard FileManager.default.fileExists(atPath: configPath.path) else {
+            debugLog("⚠️ 配置文件不存在，无需备份: \(configPath.path)")
+            return
+        }
+
+        // 确保备份目录存在
+        let backupPath = getOriginalBackupPath()
+        let backupDir = backupPath.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: backupDir,
+                                                withIntermediateDirectories: true)
+
+        // 删除旧备份（如果存在）
+        if FileManager.default.fileExists(atPath: backupPath.path) {
+            try FileManager.default.removeItem(at: backupPath)
+        }
+
+        // 备份原始配置
+        try FileManager.default.copyItem(at: configPath, to: backupPath)
+        markOriginalBackup()
+
+        debugLog("✅ 已备份原始配置: \(backupPath.path)")
+    }
+
     // MARK: - ToolHandlerProtocol
 
     /// 切换到指定镜像源
     func switchTo(_ source: MirrorSource) async throws {
         print("🔄 切换 Maven 镜像源: \(source.name)")
 
+        // 获取实际配置文件路径
+        let configPath = getConfigPath()
+        print("📁 使用配置文件: \(configPath.path)")
+
         // 1. 检查文件是否存在
-        guard FileManager.default.fileExists(atPath: mavenSettingsPath.path) else {
+        guard FileManager.default.fileExists(atPath: configPath.path) else {
             throw ToolHandlerError.configNotFound
         }
 
         // 2. 读取文件内容
-        let content = try String(contentsOfFile: mavenSettingsPath.path, encoding: .utf8)
+        let content = try String(contentsOfFile: configPath.path, encoding: .utf8)
 
         // 3. 解析 XML
         let parser = MavenSettingsParser()
@@ -45,18 +126,20 @@ class MavenHandler: ToolHandlerProtocol {
         let newContent = parser.generateXML()
 
         // 6. 写回文件
-        try newContent.write(to: mavenSettingsPath, atomically: true, encoding: .utf8)
+        try newContent.write(to: configPath, atomically: true, encoding: .utf8)
 
         print("✓ Maven 镜像源已切换到: \(source.url)")
     }
 
     /// 获取当前配置
     func getCurrentConfig() async throws -> String {
-        guard FileManager.default.fileExists(atPath: mavenSettingsPath.path) else {
+        let configPath = getConfigPath()
+
+        guard FileManager.default.fileExists(atPath: configPath.path) else {
             throw ToolHandlerError.configNotFound
         }
 
-        let content = try String(contentsOfFile: mavenSettingsPath.path, encoding: .utf8)
+        let content = try String(contentsOfFile: configPath.path, encoding: .utf8)
 
         // 尝试解析 XML 获取当前镜像 URL
         let parser = MavenSettingsParser()
@@ -71,7 +154,9 @@ class MavenHandler: ToolHandlerProtocol {
 
     /// 备份当前配置
     func backupConfig() async throws {
-        guard FileManager.default.fileExists(atPath: mavenSettingsPath.path) else {
+        let configPath = getConfigPath()
+
+        guard FileManager.default.fileExists(atPath: configPath.path) else {
             print("⚠️ settings.xml 文件不存在，跳过备份")
             return
         }
@@ -86,25 +171,47 @@ class MavenHandler: ToolHandlerProtocol {
             try FileManager.default.removeItem(at: backupPath)
         }
 
-        try FileManager.default.copyItem(at: mavenSettingsPath, to: backupPath)
+        try FileManager.default.copyItem(at: configPath, to: backupPath)
         print("✓ Maven 配置已备份")
     }
 
     /// 恢复备份配置
+    /// 优先恢复原始配置备份（settings.xml.original）
+    /// 如果没有原始备份，则使用普通备份（settings.xml.backup）
     func restoreBackup() async throws {
-        let backupPath = BackupManager.shared.backupDirectory(for: .maven)
+        let configPath = getConfigPath()
+        let originalBackupPath = getOriginalBackupPath()
+        let normalBackupPath = BackupManager.shared.backupDirectory(for: .maven)
             .appendingPathComponent("settings.xml.backup")
 
-        guard FileManager.default.fileExists(atPath: backupPath.path) else {
+        // 优先尝试恢复原始配置
+        if FileManager.default.fileExists(atPath: originalBackupPath.path) {
+            if FileManager.default.fileExists(atPath: configPath.path) {
+                try FileManager.default.removeItem(at: configPath)
+            }
+            try FileManager.default.copyItem(at: originalBackupPath, to: configPath)
+            print("✓ Maven 配置已恢复（原始备份）")
+            return
+        }
+
+        // 如果没有原始备份，尝试普通备份
+        guard FileManager.default.fileExists(atPath: normalBackupPath.path) else {
             throw ToolHandlerError.backupNotFound
         }
 
-        if FileManager.default.fileExists(atPath: mavenSettingsPath.path) {
-            try FileManager.default.removeItem(at: mavenSettingsPath)
+        if FileManager.default.fileExists(atPath: configPath.path) {
+            try FileManager.default.removeItem(at: configPath)
         }
 
-        try FileManager.default.copyItem(at: backupPath, to: mavenSettingsPath)
-        print("✓ Maven 配置已恢复")
+        try FileManager.default.copyItem(at: normalBackupPath, to: configPath)
+        print("✓ Maven 配置已恢复（普通备份）")
+    }
+
+    /// 获取配置文件目录
+    func getConfigDirectory() -> URL? {
+        let configPath = getConfigPath()
+        let configDir = configPath.deletingLastPathComponent()
+        return FileManager.default.fileExists(atPath: configDir.path) ? configDir : nil
     }
 }
 

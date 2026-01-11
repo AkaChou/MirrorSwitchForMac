@@ -21,12 +21,16 @@ class ConfigManager {
     /// 选中状态文件路径
     private let selectionFile: URL
 
+    /// 自定义工具路径文件路径
+    private let customPathFile: URL
+
     /// 私有初始化方法
     private init() {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         appDirectory = homeDir.appendingPathComponent(".mirror-switch")
         configFile = appDirectory.appendingPathComponent("config.json")
         selectionFile = appDirectory.appendingPathComponent("selection.json")
+        customPathFile = appDirectory.appendingPathComponent("custom_paths.json")
 
         // 创建目录（如果不存在）
         createDirectoryIfNeeded()
@@ -115,6 +119,83 @@ class ConfigManager {
             print("✓ 选中状态已保存: \(tool.displayName) -> \(sourceId)")
         } catch {
             print("⚠️ 选中状态保存失败: \(error.localizedDescription)")
+        }
+    }
+
+    /// 清除指定工具的选中镜像源 ID
+    func clearCurrentSelection(tool: ToolType) {
+        // 检查文件是否存在
+        guard FileManager.default.fileExists(atPath: selectionFile.path) else {
+            return
+        }
+
+        // 读取现有选中状态
+        guard let data = try? Data(contentsOf: selectionFile),
+              var selections = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return
+        }
+
+        // 移除该工具的选中状态
+        selections.removeValue(forKey: tool.rawValue)
+
+        // 如果 selections 为空，删除文件；否则保存更新后的 selections
+        if selections.isEmpty {
+            try? FileManager.default.removeItem(at: selectionFile)
+            print("✓ 选中状态已清除（文件已删除）: \(tool.displayName)")
+        } else {
+            guard let newData = try? JSONEncoder().encode(selections) else {
+                print("⚠️ 选中状态编码失败")
+                return
+            }
+
+            do {
+                try newData.write(to: selectionFile)
+                print("✓ 选中状态已清除: \(tool.displayName)")
+            } catch {
+                print("⚠️ 选中状态保存失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// 获取指定工具的自定义路径
+    func getCustomPath(for tool: ToolType) -> String? {
+        guard FileManager.default.fileExists(atPath: customPathFile.path) else {
+            return nil
+        }
+
+        guard let data = try? Data(contentsOf: customPathFile),
+              let customPaths = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return nil
+        }
+
+        return customPaths[tool.rawValue]
+    }
+
+    /// 保存指定工具的自定义路径
+    func saveCustomPath(tool: ToolType, path: String) {
+        // 读取现有自定义路径
+        var customPaths: [String: String]
+        if let data = try? Data(contentsOf: customPathFile),
+           let existing = try? JSONDecoder().decode([String: String].self, from: data) {
+            customPaths = existing
+        } else {
+            customPaths = [:]
+        }
+
+        // 更新自定义路径
+        customPaths[tool.rawValue] = path
+
+        // 保存到文件
+        guard let data = try? JSONEncoder().encode(customPaths) else {
+            print("⚠️ 自定义路径编码失败")
+            return
+        }
+
+        do {
+            try data.write(to: customPathFile)
+            print("✓ 自定义路径已保存: \(tool.displayName) -> \(path)")
+        } catch {
+            print("⚠️ 自定义路径保存失败: \(error.localizedDescription)")
         }
     }
 

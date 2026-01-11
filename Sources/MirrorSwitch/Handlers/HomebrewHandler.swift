@@ -126,6 +126,15 @@ class HomebrewHandler: ToolHandlerProtocol {
         print("✓ Homebrew 配置已恢复")
     }
 
+    /// 获取配置文件目录
+    func getConfigDirectory() -> URL? {
+        guard let brewPath = findBrewPath() else {
+            return nil
+        }
+        let brewURL = URL(fileURLWithPath: brewPath)
+        return FileManager.default.fileExists(atPath: brewURL.path) ? brewURL : nil
+    }
+
     // MARK: - Private Methods
 
     /// 查找 Homebrew 安装路径

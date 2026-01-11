@@ -27,6 +27,10 @@ protocol ToolHandlerProtocol {
     /// 恢复备份配置
     /// - Throws: 恢复失败时抛出错误
     func restoreBackup() async throws
+
+    /// 获取配置文件目录（用于在 Finder 中打开）
+    /// - Returns: 配置文件所在的目录 URL，如果目录不存在返回 nil
+    func getConfigDirectory() -> URL?
 }
 
 /// 工具处理器错误类型
