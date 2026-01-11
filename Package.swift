@@ -21,7 +21,9 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MirrorSwitch",
-            dependencies: [.product(name: "AEXML", package: "AEXML")],
+            dependencies: [
+                .product(name: "AEXML", package: "AEXML")
+            ],
             exclude: [
                 // 排除不需要打包的文件
                 "configs/README.md",
@@ -33,7 +35,10 @@ let package = Package(
                 .process("configs/app_config.json"),
                 .process("configs/mirror_config.schema.json"),
                 .process("configs/npm_mirror.json"),
+                .process("configs/orbstack_mirror.json"),
                 .process("configs/ui_strings.json"),
+                // Schema 验证文件
+                .process("configs/ToolsConfiguration.schema.json"),
             ]
         ),
     ]
