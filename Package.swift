@@ -26,13 +26,13 @@ let package = Package(
                 // 排除不需要打包的文件
                 "configs/README.md",
                 "configs/ui_strings.schema.json",
+                "configs/app_config.schema.json",
             ],
             resources: [
                 // 配置文件
                 .process("configs/app_config.json"),
-                .process("configs/app_config.schema.json"),
-                .process("configs/tools_config.json"),
-                .process("configs/tools_config.schema.json"),
+                .process("configs/mirror_config.schema.json"),
+                .process("configs/npm_mirror.json"),
                 .process("configs/ui_strings.json"),
             ]
         ),

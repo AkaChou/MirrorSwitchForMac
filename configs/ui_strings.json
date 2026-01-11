@@ -24,12 +24,6 @@
       "resetSuccess": "{toolName} 已重置为默认配置",
       "resetFailed": "重置失败：{error}"
     },
-    "tools": {
-      "npm": {
-        "name": "NPM",
-        "description": "Node Package Manager"
-      }
-    },
     "errors": {
       "toolNotFound": "未找到工具：{toolId}",
       "sourceNotFound": "未找到镜像源：{sourceId}",

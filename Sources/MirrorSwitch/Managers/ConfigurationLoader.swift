@@ -145,7 +145,7 @@ class ConfigurationLoader {
         let projectConfigPath = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .appendingPathComponent("configs")
-            .appendingPathComponent("tools_config.json")
+            .appendingPathComponent("npm_mirror.json")
 
         if FileManager.default.fileExists(atPath: projectConfigPath.path) {
             do {
@@ -280,15 +280,15 @@ class ConfigurationLoader {
 
     /// 加载内置默认配置
     func loadBuiltinConfiguration() -> ToolsConfiguration {
-        // 从 Bundle 加载 tools_config.json
+        // 从 Bundle 加载 npm_mirror.json
         do {
-            if let bundleURL = Bundle.main.url(forResource: "tools_config", withExtension: "json", subdirectory: "configs") {
+            if let bundleURL = Bundle.main.url(forResource: "npm_mirror", withExtension: "json", subdirectory: "configs") {
                 let data = try Data(contentsOf: bundleURL)
                 let decoder = JSONDecoder()
                 let config = try decoder.decode(ToolsConfiguration.self, from: data)
                 print("✅ 已从 Bundle 加载内置配置，共 \(config.tools.count) 个工具")
                 return config
-            } else if let bundleURL = Bundle.main.url(forResource: "tools_config", withExtension: "json") {
+            } else if let bundleURL = Bundle.main.url(forResource: "npm_mirror", withExtension: "json") {
                 let data = try Data(contentsOf: bundleURL)
                 let decoder = JSONDecoder()
                 let config = try decoder.decode(ToolsConfiguration.self, from: data)

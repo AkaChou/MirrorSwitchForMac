@@ -71,7 +71,6 @@ struct AppConfiguration: Codable {
         let autoBackupBeforeSwitch: Bool
         let confirmBeforeReset: Bool
         let closeMenuAfterSwitch: Bool
-        let restartDockerAfterOrbStackSwitch: Bool
     }
 
     struct NetworkConfiguration: Codable {
@@ -135,7 +134,6 @@ struct UIStringsConfiguration: Codable {
         let app: AppStrings
         let menu: MenuStrings
         let sources: SourceStrings
-        let tools: ToolsStrings
         let errors: ErrorStrings
         let notifications: NotificationStrings
         let settings: SettingsStrings
@@ -163,20 +161,6 @@ struct UIStringsConfiguration: Codable {
             let resetConfirmMessage: String
             let resetSuccess: String
             let resetFailed: String
-        }
-
-        struct ToolsStrings: Codable {
-            let npm: ToolInfo
-            let maven: ToolInfo
-            let homebrew: ToolInfo
-            let orbstack: ToolInfo
-            let pip: ToolInfo
-            let gradle: ToolInfo
-
-            struct ToolInfo: Codable {
-                let name: String
-                let description: String
-            }
         }
 
         struct ErrorStrings: Codable {

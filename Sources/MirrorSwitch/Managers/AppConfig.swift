@@ -99,11 +99,6 @@ class AppConfigManager {
         appConfig?.behavior.closeMenuAfterSwitch ?? false
     }
 
-    /// 是否在 OrbStack 切换后重启 Docker
-    var restartDockerAfterOrbStackSwitch: Bool {
-        appConfig?.behavior.restartDockerAfterOrbStackSwitch ?? true
-    }
-
     // MARK: - 网络配置访问
 
     /// 网络用户代理
@@ -208,28 +203,13 @@ class AppConfigManager {
         }
     }
 
-    /// 获取工具相关字符串
+    /// 获取工具相关字符串（从工具配置动态获取）
     func toolString(toolId: String) -> (name: String, description: String)? {
-        guard let tools = uiStrings?.strings.tools else {
+        // 从 ConfigurationDrivenSourceManager 动态获取工具信息
+        guard let tool = ConfigurationDrivenSourceManager.shared.getTool(by: toolId) else {
             return nil
         }
-
-        switch toolId {
-        case "npm":
-            return (name: tools.npm.name, description: tools.npm.description)
-        case "maven":
-            return (name: tools.maven.name, description: tools.maven.description)
-        case "homebrew":
-            return (name: tools.homebrew.name, description: tools.homebrew.description)
-        case "orbstack":
-            return (name: tools.orbstack.name, description: tools.orbstack.description)
-        case "pip":
-            return (name: tools.pip.name, description: tools.pip.description)
-        case "gradle":
-            return (name: tools.gradle.name, description: tools.gradle.description)
-        default:
-            return nil
-        }
+        return (name: tool.name, description: tool.description ?? tool.name)
     }
 
     /// 获取错误消息
