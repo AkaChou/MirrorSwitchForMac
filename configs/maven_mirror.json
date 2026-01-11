@@ -1,0 +1,86 @@
+{
+  "version": "1.0.0",
+  "tools": [
+    {
+      "id": "maven",
+      "name": "Maven",
+      "description": "Apache Maven 项目管理工具",
+      "detection": {
+        "command": "mvn",
+        "arguments": [
+          "--version"
+        ],
+        "fallbackDetection": {
+          "type": "file",
+          "path": "~/.m2/settings.xml"
+        }
+      },
+      "sources": [
+        {
+          "id": "maven-official",
+          "name": "官方源",
+          "url": "https://repo.maven.apache.org/maven2/",
+          "description": "Maven 中央仓库"
+        },
+        {
+          "id": "maven-aliyun",
+          "name": "阿里云",
+          "url": "https://maven.aliyun.com/repository/public/",
+          "description": "阿里云镜像",
+          "region": "CN"
+        },
+        {
+          "id": "maven-tencent",
+          "name": "腾讯云",
+          "url": "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/",
+          "description": "腾讯云镜像",
+          "region": "CN"
+        },
+        {
+          "id": "maven-huawei",
+          "name": "华为云",
+          "url": "https://mirrors.huaweicloud.com/repository/maven/",
+          "description": "华为云镜像",
+          "region": "CN"
+        },
+        {
+          "id": "maven-163",
+          "name": "网易163",
+          "url": "https://mirrors.163.com/maven/repository/maven-public/",
+          "description": "网易163镜像",
+          "region": "CN"
+        }
+      ],
+      "strategy": {
+        "type": "xml",
+        "filePath": "~/.m2/settings.xml",
+        "set": {
+          "xpath": "//mirrors/mirror/url",
+          "value": "{{url}}",
+          "ensureStructure": {
+            "createIfMissing": true,
+            "createParentDirectories": true,
+            "defaultStructure": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\"\n    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n    xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0\n    https://maven.apache.org/xsd/settings-1.0.0.xsd\">\n    <mirrors>\n        <mirror>\n            <id>mirror-switch</id>\n            <mirrorOf>*</mirrorOf>\n            <name>Mirror Switch Mirror</name>\n            <url>{{url}}</url>\n        </mirror>\n    </mirrors>\n</settings>"
+          }
+        },
+        "get": {
+          "xpath": "//mirrors/mirror/url"
+        }
+      },
+      "backup": {
+        "filePath": "~/.m2/settings.xml",
+        "backupFileName": "settings.xml.backup",
+        "backupOriginal": true
+      },
+      "metadata": {
+        "supportedPlatforms": [
+          "macOS",
+          "linux",
+          "windows"
+        ],
+        "supportsSpeedTest": true,
+        "documentationURL": "https://maven.apache.org/"
+      }
+    }
+  ]
+}
