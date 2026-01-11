@@ -35,7 +35,6 @@ let package = Package(
                 .process("configs/app_config.json"),
                 .process("configs/mirror_config.schema.json"),
                 .process("configs/npm_mirror.json"),
-                .process("configs/orbstack_mirror.json"),
                 .process("configs/ui_strings.json"),
                 // Schema 验证文件
                 .process("configs/ToolsConfiguration.schema.json"),

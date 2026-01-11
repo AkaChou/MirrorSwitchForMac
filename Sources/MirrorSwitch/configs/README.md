@@ -4,6 +4,8 @@
 
 ## ⚠️ 重要提示
 
+### 📁 目录说明
+
 本项目中有两个 `configs/` 目录：
 
 1. **根目录的 `configs/`** ← **请在此处编辑配置文件**
@@ -11,14 +13,43 @@
    - 方便查看和编辑
    - 版本控制的主要目录
 
-2. **`Sources/MirrorSwitch/configs/`** ← **自动同步，请勿手动编辑**
+2. **`Sources/MirrorSwitch/configs/`** ← **⛔ 严格规则：只保留 npm 默认配置**
    - Swift Package Manager 需要资源在目标目录下
    - 由同步脚本自动从根目录复制
+   - **⚠️ 禁止手动添加其他工具配置到此处**
+
+### 🚫 严格规则
+
+**`Sources/MirrorSwitch/configs/` 目录必须且只能包含以下文件**：
+
+```
+Sources/MirrorSwitch/configs/
+├── npm_mirror.json          ✅ 唯一允许的工具配置文件
+├── app_config.json          ✅ 应用配置
+├── ui_strings.json          ✅ UI 字符串
+├── mirror_config.schema.json ✅ 配置 Schema
+├── app_config.schema.json   ✅ 应用配置 Schema
+└── README.md                ✅ 本说明文件
+```
+
+**❌ 禁止操作**：
+- ❌ **不要**在 `Sources/MirrorSwitch/configs/` 中添加其他工具配置文件（如 `orbstack_mirror.json`、`maven_mirror.json` 等）
+- ❌ **不要**手动编辑此目录下的文件（应该通过根目录 configs/ 编辑并同步）
+- ❌ **不要**直接在此目录创建新文件
+
+**✅ 正确做法**：
+- ✅ 其他工具配置应通过 **远程配置** 或 **用户本地配置** 动态加载
+- ✅ 在根目录 `configs/` 编辑配置，然后运行同步脚本
+- ✅ 使用远程配置 URL 来扩展工具支持
+
+### 🔄 同步配置
 
 **编辑配置后，请运行同步脚本**：
 ```bash
 ./sync-configs.sh
 ```
+
+这会将根目录的配置文件同步到 `Sources/MirrorSwitch/configs/`。
 
 ## 🎯 内置配置策略
 
