@@ -39,6 +39,12 @@ class ConfigurationDrivenSourceManager {
     /// 是否已初始化
     private var isInitialized = false
 
+    /// 镜像源到配置源的映射
+    private var sourceToConfigSource: [String: (configSourceId: String, configSourceName: String)] = [:]
+
+    /// 镜像源可见性设置
+    private var sourceVisibility: [String: Bool] = [:]
+
     // MARK: - 配置管理器引用
 
     /// 配置管理器（用于保存选中状态）
@@ -72,6 +78,9 @@ class ConfigurationDrivenSourceManager {
         // 加载保存的选中状态
         loadCurrentSelection()
 
+        // 加载镜像源可见性设置
+        loadSourceVisibility()
+
         // 检测当前实际使用的镜像源
         await detectCurrentSources()
 
@@ -104,17 +113,25 @@ class ConfigurationDrivenSourceManager {
     func getSources(for toolId: String) -> [MirrorSource] {
         guard let tool = cachedTools[toolId] else { return [] }
 
-        // 将 SourceConfiguration 转换为 MirrorSource
-        return tool.sources.map { source in
-            MirrorSource(
-                id: source.id,
-                name: source.name,
-                url: source.url,
-                description: source.description,
-                pingTime: getPingTime(for: source.id),
-                isSelected: currentSelection[toolId] == source.id
-            )
-        }
+        // 将 SourceConfiguration 转换为 MirrorSource，并过滤不可见的源
+        return tool.sources
+            .map { source in
+                // 获取镜像源的配置源信息
+                let configSourceInfo = getConfigSourceInfo(for: source.id)
+
+                return MirrorSource(
+                    id: source.id,
+                    name: source.name,
+                    url: source.url,
+                    description: source.description,
+                    pingTime: getPingTime(for: source.id),
+                    isSelected: currentSelection[toolId] == source.id,
+                    configSourceId: configSourceInfo?.0,
+                    configSourceName: configSourceInfo?.1,
+                    isVisible: isSourceVisible(sourceId: source.id)
+                )
+            }
+            .filter { $0.isVisible }  // 只返回可见的镜像源
     }
 
     /// 获取工具的镜像源列表（支持 ToolType）
@@ -151,6 +168,11 @@ class ConfigurationDrivenSourceManager {
     /// 切换到指定镜像源（支持 ToolType 和 MirrorSource）
     func switchSource(tool: ToolType, source: MirrorSource) async throws {
         try await switchSource(toolId: tool.rawValue, sourceId: source.id)
+    }
+
+    /// 切换到指定镜像源（支持 toolId 和 MirrorSource）
+    func switchSource(toolId: String, source: MirrorSource) async throws {
+        try await switchSource(toolId: toolId, sourceId: source.id)
     }
 
     /// 获取当前配置
@@ -209,8 +231,12 @@ class ConfigurationDrivenSourceManager {
 
         try await restoreConfig(backup: backup, tool: tool)
 
-        // 恢复后重新检测当前使用的镜像源
-        await detectCurrentSource(for: toolId)
+        // 恢复后清除当前选择状态（重置为默认配置不应该自动匹配任何镜像源）
+        currentSelection.removeValue(forKey: toolId)
+        if let toolType = ToolType(rawValue: toolId) {
+            configManager.clearCurrentSelection(tool: toolType)
+        }
+        print("✓ \(tool.name) 已恢复默认配置，清除镜像源选择状态")
     }
 
     /// 恢复配置（支持 ToolType）
@@ -360,7 +386,7 @@ class ConfigurationDrivenSourceManager {
         }
 
         let backupPath = BackupManager.shared.backupDirectory(
-            for: ToolType(rawValue: tool.id) ?? .npm
+            for: tool.id
         ).appendingPathComponent(backup.backupFileName)
 
         // 确保备份目录存在
@@ -384,7 +410,7 @@ class ConfigurationDrivenSourceManager {
     private func restoreConfig(backup: BackupConfiguration, tool: ToolConfiguration) async throws {
         let filePath = try await expandPath(backup.filePath, tool: tool)
         let backupDir = BackupManager.shared.backupDirectory(
-            for: ToolType(rawValue: tool.id) ?? .npm
+            for: tool.id
         )
 
         print("🔍 [DEBUG] 原始文件路径: \(filePath)")
@@ -481,6 +507,66 @@ class ConfigurationDrivenSourceManager {
         }
 
         return expandedPath
+    }
+
+    /// 获取镜像源所属的配置源信息
+    /// - Parameter sourceId: 镜像源 ID
+    /// - Returns: (配置源 ID, 配置源名称)
+    private func getConfigSourceInfo(for sourceId: String) -> (String, String)? {
+        return sourceToConfigSource[sourceId]
+    }
+
+    /// 检查镜像源是否可见
+    /// - Parameter sourceId: 镜像源 ID
+    /// - Returns: 是否可见（默认可见）
+    private func isSourceVisible(sourceId: String) -> Bool {
+        return sourceVisibility[sourceId] ?? true
+    }
+
+    /// 设置镜像源可见性
+    /// - Parameters:
+    ///   - sourceId: 镜像源 ID
+    ///   - isVisible: 是否可见
+    func setSourceVisibility(sourceId: String, isVisible: Bool) {
+        sourceVisibility[sourceId] = isVisible
+        saveSourceVisibility()
+    }
+
+    /// 保存镜像源可见性设置
+    private func saveSourceVisibility() {
+        // 保存到配置文件
+        if let data = try? JSONEncoder().encode(sourceVisibility) {
+            let filePath = getConfigSourceVisibilityFilePath()
+            do {
+                try data.write(to: filePath)
+                debugLog("✓ 镜像源可见性已保存")
+            } catch {
+                print("⚠️ 镜像源可见性保存失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// 加载镜像源可见性设置
+    private func loadSourceVisibility() {
+        let filePath = getConfigSourceVisibilityFilePath()
+        guard FileManager.default.fileExists(atPath: filePath.path) else {
+            return
+        }
+
+        guard let data = try? Data(contentsOf: filePath),
+              let visibility = try? JSONDecoder().decode([String: Bool].self, from: data) else {
+            return
+        }
+
+        sourceVisibility = visibility
+        debugLog("✓ 镜像源可见性已加载")
+    }
+
+    /// 获取镜像源可见性配置文件路径
+    private func getConfigSourceVisibilityFilePath() -> URL {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let appDirectory = homeDir.appendingPathComponent(".mirror-switch")
+        return appDirectory.appendingPathComponent("source_visibility.json")
     }
 
     /// 解析命令输出
