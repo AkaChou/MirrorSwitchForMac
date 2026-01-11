@@ -188,6 +188,7 @@ class MenuUpdateHelper: NSObject {
     private var menuItemViews: [ToolType: MenuItemView] = [:]  // 保存一级菜单 view 引用
     private var toolVersions: [ToolType: String] = [:]  // 工具版本信息
     private var toolCurrentSources: [ToolType: MirrorSource] = [:]  // 工具当前选中的源
+    private var configManagementWindow: ConfigManagementWindow?  // 配置管理窗口
 
     init(statusItem: NSStatusItem?) {
         self.statusItem = statusItem
@@ -262,6 +263,10 @@ class MenuUpdateHelper: NSObject {
             let submenu = buildSubMenu(for: tool)
             menuItem.submenu = submenu
         }
+
+        // 配置菜单项
+        let configMenuItem = createConfigMenuItem()
+        menu.addItem(configMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -449,6 +454,10 @@ class MenuUpdateHelper: NSObject {
             let submenu = buildSubMenu(for: tool)
             menuItem.submenu = submenu
         }
+
+        // 配置菜单项
+        let configMenuItem = createConfigMenuItem()
+        newMenu.addItem(configMenuItem)
 
         newMenu.addItem(NSMenuItem.separator())
 
@@ -1003,6 +1012,42 @@ class MenuUpdateHelper: NSObject {
                     debugLog("❌ 重置失败: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+
+    /// 创建配置菜单项
+    private func createConfigMenuItem() -> NSMenuItem {
+        // 创建配置菜单项视图
+        let configItemView = MenuItemView(
+            frame: NSRect(x: 0, y: 0, width: LayoutConstants.primaryMenuWidth, height: LayoutConstants.primaryMenuHeight),
+            toolName: "⚙️ 配置...",
+            version: nil,
+            sourceName: ""
+        )
+
+        // 隐藏箭头（配置菜单项不需要箭头）
+        if let arrowTextField = configItemView.arrowTextField {
+            arrowTextField.isHidden = true
+        }
+
+        let menuItem = NSMenuItem()
+        menuItem.view = configItemView
+
+        // 设置点击事件
+        menuItem.target = self
+        menuItem.action = #selector(openConfigWindow)
+
+        return menuItem
+    }
+
+    /// 打开配置管理窗口
+    @objc private func openConfigWindow() {
+        // 延迟执行，确保菜单已关闭
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if self.configManagementWindow == nil {
+                self.configManagementWindow = ConfigManagementWindow()
+            }
+            self.configManagementWindow?.show()
         }
     }
 
@@ -1751,7 +1796,7 @@ class MenuItemView: NSView {
     private var nameTextField: NSTextField!
     private var versionTextField: NSTextField!
     private var sourceTextField: NSTextField!
-    private var arrowTextField: NSTextField!
+    var arrowTextField: NSTextField!  // 改为 internal，允许外部访问以隐藏箭头
     private let toolName: String
     private let version: String?
     private let sourceName: String
