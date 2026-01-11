@@ -153,7 +153,7 @@ actor StrategyExecutor {
         source: SourceConfiguration,
         tool: ToolConfiguration
     ) async throws {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         // 检查文件是否存在
         if !FileManager.default.fileExists(atPath: filePath) {
@@ -171,10 +171,7 @@ actor StrategyExecutor {
         }
 
         // 读取文件
-        let content = try String(contentsOfFile: filePath, encoding: .utf8)
-
-        // 使用 AEXML 解析
-        let document = try AEXMLDocument(xml: content)
+        var content = try String(contentsOfFile: filePath, encoding: .utf8)
 
         // 解析值
         let value = try TemplateVariableParser.parse(
@@ -182,18 +179,18 @@ actor StrategyExecutor {
             variables: TemplateVariableParser.extractVariables(from: source, context: [:])
         )
 
-        // 使用 XPath 更新值
-        try updateXMLPath(document: document, xpath: strategy.set.xpath, value: value)
+        // 使用正则表达式直接替换 XML 中的值（保持格式不变）
+        content = try replaceXMLValue(xmlContent: content, xpath: strategy.set.xpath, newValue: value)
 
         // 写回文件
-        try document.xml.write(toFile: filePath, atomically: true, encoding: .utf8)
+        try content.write(toFile: filePath, atomically: true, encoding: .utf8)
     }
 
     private func getXMLConfig(
         _ strategy: XMLStrategy,
         tool: ToolConfiguration
     ) async throws -> String {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         guard FileManager.default.fileExists(atPath: filePath) else {
             throw SourceManagerError.configNotFound
@@ -212,7 +209,7 @@ actor StrategyExecutor {
         source: SourceConfiguration,
         tool: ToolConfiguration
     ) async throws {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         // 检查文件是否存在
         if !FileManager.default.fileExists(atPath: filePath) {
@@ -252,7 +249,7 @@ actor StrategyExecutor {
         _ strategy: JSONPathStrategy,
         tool: ToolConfiguration
     ) async throws -> String {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         guard FileManager.default.fileExists(atPath: filePath) else {
             throw SourceManagerError.configNotFound
@@ -279,7 +276,7 @@ actor StrategyExecutor {
         source: SourceConfiguration,
         tool: ToolConfiguration
     ) async throws {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         guard FileManager.default.fileExists(atPath: filePath) else {
             throw SourceManagerError.configNotFound
@@ -313,7 +310,7 @@ actor StrategyExecutor {
         _ strategy: RegexStrategy,
         tool: ToolConfiguration
     ) async throws -> String {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         guard FileManager.default.fileExists(atPath: filePath) else {
             throw SourceManagerError.configNotFound
@@ -347,7 +344,7 @@ actor StrategyExecutor {
         source: SourceConfiguration,
         tool: ToolConfiguration
     ) async throws {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         // 解析值
         let value = try TemplateVariableParser.parse(
@@ -395,7 +392,7 @@ actor StrategyExecutor {
         _ strategy: KeyValueStrategy,
         tool: ToolConfiguration
     ) async throws -> String {
-        let filePath = try expandPath(strategy.filePath, tool: tool)
+        let filePath = try await expandPath(strategy.filePath, tool: tool)
 
         guard FileManager.default.fileExists(atPath: filePath) else {
             throw SourceManagerError.configNotFound
@@ -455,7 +452,65 @@ actor StrategyExecutor {
         return result
     }
 
-    /// 展开路径（支持 ~）
+    /// 展开路径（支持 ~ 和自定义路径）
+    private func expandPath(_ path: String, tool: ToolConfiguration) async throws -> String {
+        // 1. 先展开 ~
+        var expandedPath = (path as NSString).expandingTildeInPath
+
+        // 2. 检查是否有用户手动选择的路径
+        if let customPath = await ConfigManager.shared.getCustomPath(for: tool.id) {
+            debugLog("🔍 检测到自定义路径: \(customPath)")
+
+            // 如果是默认的配置文件路径，尝试在自定义路径下查找配置文件
+            if isDefaultConfigPath(path, for: tool.id) {
+                // 尝试在自定义路径下查找配置文件
+                if let customConfigPath = findConfigInCustomPath(
+                    originalPath: path,
+                    customPath: customPath,
+                    toolId: tool.id
+                ) {
+                    debugLog("✅ 使用自定义路径下的配置文件: \(customConfigPath)")
+                    expandedPath = customConfigPath
+                } else {
+                    debugLog("⚠️ 自定义路径下未找到配置文件，使用默认路径: \(expandedPath)")
+                }
+            }
+        }
+
+        return expandedPath
+    }
+
+    /// 判断是否是默认配置文件路径
+    private func isDefaultConfigPath(_ path: String, for toolId: String) -> Bool {
+        // Maven 的默认配置文件路径
+        if toolId == "maven" && path == "~/.m2/settings.xml" {
+            return true
+        }
+        // 可以添加其他工具的默认路径判断
+        return false
+    }
+
+    /// 在自定义路径下查找配置文件
+    private func findConfigInCustomPath(
+        originalPath: String,
+        customPath: String,
+        toolId: String
+    ) -> String? {
+        // Maven 特殊处理
+        if toolId == "maven" {
+            // 尝试在自定义 Maven 目录下的 conf/settings.xml
+            let customConfigPath = "\(customPath)/conf/settings.xml"
+            if FileManager.default.fileExists(atPath: customConfigPath) {
+                return customConfigPath
+            }
+        }
+
+        // 可以添加其他工具的特殊处理
+
+        return nil
+    }
+
+    /// 展开路径（支持 ~）- 同步版本
     private func expandPath(_ path: String, tool: ToolConfiguration) throws -> String {
         let expandedPath = (path as NSString).expandingTildeInPath
         return expandedPath
@@ -487,7 +542,105 @@ actor StrategyExecutor {
 
     // MARK: - XML 辅助方法
 
-    /// 更新 XML 路径
+    /// 替换 XML 元素的值（使用正则表达式，保持格式不变）
+    /// - Parameters:
+    ///   - xmlContent: XML 内容
+    ///   - xpath: XPath 路径，如 //mirrors/mirror/url
+    ///   - newValue: 新值
+    /// - Returns: 替换后的 XML 内容
+    private func replaceXMLValue(xmlContent: String, xpath: String, newValue: String) throws -> String {
+        // 解析 XPath，如 //mirrors/mirror/url
+        let parts = xpath.components(separatedBy: "/").filter { !$0.isEmpty }
+
+        // 跳过开头的 //（表示从根节点开始）
+        let elementPath = parts.dropFirst().map { part in
+            // 移除索引标记，如 [1]
+            return part.components(separatedBy: "[").first ?? part
+        }
+
+        guard !elementPath.isEmpty else {
+            throw SourceManagerError.parseFailed("无效的 XPath: \(xpath)")
+        }
+
+        // 从后向前构建正则表达式
+        // 对于 //mirrors/mirror/url，我们需要匹配 <url>旧值</url>
+        let targetElement = elementPath.last!
+        let parentPath = elementPath.dropLast()
+
+        // 构建正则表达式：匹配 <targetElement>任意内容</targetElement>
+        // 需要考虑：
+        // 1. 可能有空格和换行
+        // 2. 可能有属性
+        // 3. 需要验证父元素路径
+
+        var result = xmlContent
+        var found = false
+
+        // 如果有父路径，需要先验证父元素
+        if !parentPath.isEmpty {
+            // 构建匹配整个路径的正则表达式
+            // 例如：<mirrors>.*?<mirror>.*?<url>(.*?)</url>
+            var pattern = "<"
+            pattern += parentPath.joined(separator: ">.*?<")
+            pattern += ">"
+
+            // 添加目标元素
+            pattern += "[\\s\\S]*?<\(targetElement)>([\\s\\S]*?)</\(targetElement)>"
+
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else {
+                throw SourceManagerError.parseFailed("构建正则表达式失败")
+            }
+
+            let range = NSRange(xmlContent.startIndex..., in: xmlContent)
+            let matches = regex.matches(in: xmlContent, range: range)
+
+            if let match = matches.last, match.numberOfRanges > 1 {
+                let valueRange = match.range(at: 1)
+                if let range = Range(valueRange, in: xmlContent) {
+                    // 替换值
+                    let oldValue = String(xmlContent[range])
+                    let location = valueRange.location
+                    let length = valueRange.length
+
+                    // 构建新的内容
+                    let nsRange = NSRange(location: location, length: length)
+                    result = (xmlContent as NSString).replacingCharacters(in: nsRange, with: newValue)
+                    found = true
+                }
+            }
+        } else {
+            // 没有父路径，直接匹配目标元素
+            let pattern = "<\(targetElement)>([\\s\\S]*?)</\(targetElement)>"
+
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else {
+                throw SourceManagerError.parseFailed("构建正则表达式失败")
+            }
+
+            let range = NSRange(xmlContent.startIndex..., in: xmlContent)
+            let matches = regex.matches(in: xmlContent, range: range)
+
+            if let match = matches.last, match.numberOfRanges > 1 {
+                let valueRange = match.range(at: 1)
+                if let range = Range(valueRange, in: xmlContent) {
+                    let location = valueRange.location
+                    let length = valueRange.length
+
+                    // 构建新的内容
+                    let nsRange = NSRange(location: location, length: length)
+                    result = (xmlContent as NSString).replacingCharacters(in: nsRange, with: newValue)
+                    found = true
+                }
+            }
+        }
+
+        if !found {
+            throw SourceManagerError.parseFailed("未找到 XPath 对应的元素: \(xpath)")
+        }
+
+        return result
+    }
+
+    /// 更新 XML 路径（旧方法，保留用于兼容）
     private func updateXMLPath(document: AEXMLDocument, xpath: String, value: String) throws {
         // 解析 XPath，如 //mirrors/mirror[1]/url
         let parts = xpath.components(separatedBy: "/").filter { !$0.isEmpty }
