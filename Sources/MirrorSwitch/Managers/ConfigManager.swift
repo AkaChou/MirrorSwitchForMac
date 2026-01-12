@@ -49,7 +49,8 @@ class ConfigManager {
 
         // 读取并解析配置文件
         guard let data = try? Data(contentsOf: configFile),
-              let config = try? JSONDecoder().decode(MirrorSourceConfiguration.self, from: data) else {
+            let config = try? JSONDecoder().decode(MirrorSourceConfiguration.self, from: data)
+        else {
             // 解析失败，返回默认配置
             return MirrorSourceConfiguration.defaultConfig
         }
@@ -87,7 +88,8 @@ class ConfigManager {
         }
 
         guard let data = try? Data(contentsOf: selectionFile),
-              let selections = try? JSONDecoder().decode([String: String].self, from: data) else {
+            let selections = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
             return nil
         }
 
@@ -99,7 +101,8 @@ class ConfigManager {
         // 读取现有选中状态
         var selections: [String: String]
         if let data = try? Data(contentsOf: selectionFile),
-           let existing = try? JSONDecoder().decode([String: String].self, from: data) {
+            let existing = try? JSONDecoder().decode([String: String].self, from: data)
+        {
             selections = existing
         } else {
             selections = [:]
@@ -131,7 +134,8 @@ class ConfigManager {
 
         // 读取现有选中状态
         guard let data = try? Data(contentsOf: selectionFile),
-              var selections = try? JSONDecoder().decode([String: String].self, from: data) else {
+            var selections = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
             return
         }
 
@@ -168,7 +172,8 @@ class ConfigManager {
         }
 
         guard let data = try? Data(contentsOf: selectionFile),
-              let selections = try? JSONDecoder().decode([String: String].self, from: data) else {
+            let selections = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
             return nil
         }
 
@@ -183,7 +188,8 @@ class ConfigManager {
         // 读取现有选中状态
         var selections: [String: String]
         if let data = try? Data(contentsOf: selectionFile),
-           let existing = try? JSONDecoder().decode([String: String].self, from: data) {
+            let existing = try? JSONDecoder().decode([String: String].self, from: data)
+        {
             selections = existing
         } else {
             selections = [:]
@@ -206,6 +212,21 @@ class ConfigManager {
         }
     }
 
+    /// 获取所有选中状态
+    func getAllSelections() -> [String: String] {
+        guard FileManager.default.fileExists(atPath: selectionFile.path) else {
+            return [:]
+        }
+
+        guard let data = try? Data(contentsOf: selectionFile),
+            let selections = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
+            return [:]
+        }
+
+        return selections
+    }
+
     /// 清除指定工具的选中镜像源 ID（通过工具 ID）
     /// - Parameter toolId: 工具 ID
     func clearCurrentSelection(toolId: String) {
@@ -216,7 +237,8 @@ class ConfigManager {
 
         // 读取现有选中状态
         guard let data = try? Data(contentsOf: selectionFile),
-              var selections = try? JSONDecoder().decode([String: String].self, from: data) else {
+            var selections = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
             return
         }
 
@@ -261,7 +283,8 @@ class ConfigManager {
         }
 
         guard let data = try? Data(contentsOf: customPathFile),
-              let customPaths = try? JSONDecoder().decode([String: String].self, from: data) else {
+            let customPaths = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
             return nil
         }
 
@@ -276,7 +299,8 @@ class ConfigManager {
         // 读取现有自定义路径
         var customPaths: [String: String]
         if let data = try? Data(contentsOf: customPathFile),
-           let existing = try? JSONDecoder().decode([String: String].self, from: data) {
+            let existing = try? JSONDecoder().decode([String: String].self, from: data)
+        {
             customPaths = existing
         } else {
             customPaths = [:]
@@ -305,9 +329,10 @@ class ConfigManager {
     private func createDirectoryIfNeeded() {
         if !FileManager.default.fileExists(atPath: appDirectory.path) {
             do {
-                try FileManager.default.createDirectory(at: appDirectory,
-                                                        withIntermediateDirectories: true,
-                                                        attributes: nil)
+                try FileManager.default.createDirectory(
+                    at: appDirectory,
+                    withIntermediateDirectories: true,
+                    attributes: nil)
                 print("✓ 应用目录已创建: \(appDirectory.path)")
             } catch {
                 print("⚠️ 创建应用目录失败: \(error.localizedDescription)")

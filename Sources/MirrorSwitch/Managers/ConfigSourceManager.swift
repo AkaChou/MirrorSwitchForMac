@@ -49,7 +49,8 @@ class ConfigSourceManager {
 
     /// 获取启用的配置源（按类型排序：builtin > local > remote）
     func getEnabledSources() -> [ConfigSource] {
-        return configSources
+        return
+            configSources
             .filter { $0.isEnabled }
             .sorted { lhs, rhs in
                 // 内置配置优先级最高
@@ -83,7 +84,8 @@ class ConfigSourceManager {
     func removeConfigSource(id: UUID) {
         // 不允许删除内置配置
         guard let source = configSources.first(where: { $0.id == id }),
-              source.type != .builtin else {
+            source.type != .builtin
+        else {
             print("⚠️ 不允许删除内置配置")
             return
         }
@@ -160,7 +162,8 @@ class ConfigSourceManager {
                 let (_, response) = try await URLSession.shared.data(from: url)
 
                 if let httpResponse = response as? HTTPURLResponse,
-                   httpResponse.statusCode == 200 {
+                    httpResponse.statusCode == 200
+                {
                     updateConfigSourceStatus(id: source.id, status: .valid)
                     return true
                 } else {
@@ -316,9 +319,12 @@ class ConfigSourceManager {
     /// 检查工具是否应该在一级菜单中显示
     /// - Parameters:
     ///   - toolId: 工具 ID
+    ///   - originalId: 原始工具 ID (可选，用于兼容旧配置)
     ///   - configSourceId: 配置源 ID（可选，用于精确匹配指定配置源）
     /// - Returns: 是否应该显示
-    func isToolVisibleInMenu(toolId: String, configSourceId: UUID? = nil) -> Bool {
+    func isToolVisibleInMenu(toolId: String, originalId: String? = nil, configSourceId: UUID? = nil)
+        -> Bool
+    {
         var hasExplicitConfig = false  // 是否有配置源明确配置了该工具的可见性
 
         // 检查所有启用的配置源
@@ -336,12 +342,27 @@ class ConfigSourceManager {
             // 该配置源有设置过工具可见性
             hasExplicitConfig = true
 
-            // 检查是否明确配置了该工具
+            // 1. 优先检查精确 ID (uuid_id)
             if let toolVisible = visibility[toolId] {
                 if toolVisible {
                     return true  // 该工具明确设置为可见
                 }
-                // 如果设置为 false，继续检查其他配置源
+                // 如果设置为 false，继续检查其他配置源?
+                // 不，如果明确设置为 false，且其他配置源没有设置为 true，则应该不可见?
+                // 这里的逻辑是：只要有一个配置源说"可见"，就可见?
+                // 原逻辑:
+                // if toolVisible { return true }
+                // if false, continue loop (to see if other sources allow it).
+                // So yes, it's an OR logic across sources.
+                continue
+            }
+
+            // 2. 只有在没有精确设置时，才检查原始 ID (兼容旧配置)
+            if let origId = originalId, let toolVisible = visibility[origId] {
+                if toolVisible {
+                    return true
+                }
+                continue
             }
         }
 
@@ -351,7 +372,7 @@ class ConfigSourceManager {
             return true
         }
 
-        // 所有明确配置过的配置源都将该工具设为不可见
+        // 所有明确配置过的配置源都将该工具设为不可见 (或未配置)
         return false
     }
 }

@@ -24,10 +24,22 @@ struct ToolsConfiguration: Codable {
 /// 单个工具的完整配置
 struct ToolConfiguration: Codable, Identifiable {
     /// 工具唯一标识
-    let id: String
+    var id: String
+
+    /// 原始 ID (用于区分多配置源下的同名工具)
+    var originalId: String? = nil
+
+    /// 所属配置源 ID
+    var configSourceId: String? = nil
 
     /// 显示名称
     let name: String
+
+    // ...
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, description, detection, sources, strategy, backup, metadata, postActions
+    }
 
     /// 描述信息
     let description: String?
@@ -54,8 +66,10 @@ struct ToolConfiguration: Codable, Identifiable {
 
     /// 创建带有新镜像源列表的副本
     func withSources(_ sources: [SourceConfiguration]) -> ToolConfiguration {
-        return ToolConfiguration(
+        var newTool = ToolConfiguration(
             id: self.id,
+            originalId: self.originalId,
+            configSourceId: self.configSourceId,
             name: self.name,
             description: self.description,
             detection: self.detection,
@@ -65,6 +79,7 @@ struct ToolConfiguration: Codable, Identifiable {
             metadata: self.metadata,
             postActions: self.postActions
         )
+        return newTool
     }
 }
 
@@ -100,7 +115,10 @@ struct DetectionConfiguration: Codable {
     let fallbackDetection: FallbackDetection?
 
     // 默认成员初始化器
-    init(command: String = "", arguments: [String] = [], customPaths: [String]? = nil, fallbackDetection: FallbackDetection? = nil) {
+    init(
+        command: String = "", arguments: [String] = [], customPaths: [String]? = nil,
+        fallbackDetection: FallbackDetection? = nil
+    ) {
         self.command = command
         self.arguments = arguments
         self.customPaths = customPaths
@@ -113,7 +131,8 @@ struct DetectionConfiguration: Codable {
         self.command = try container.decodeIfPresent(String.self, forKey: .command) ?? ""
         self.arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
         self.customPaths = try container.decodeIfPresent([String].self, forKey: .customPaths)
-        self.fallbackDetection = try container.decodeIfPresent(FallbackDetection.self, forKey: .fallbackDetection)
+        self.fallbackDetection = try container.decodeIfPresent(
+            FallbackDetection.self, forKey: .fallbackDetection)
     }
 
     /// 编码器
@@ -208,7 +227,7 @@ enum FallbackDetection: Codable {
 /// 镜像源配置
 struct SourceConfiguration: Codable, Identifiable {
     /// 唯一标识
-    let id: String
+    var id: String
 
     /// 显示名称
     let name: String
@@ -437,12 +456,12 @@ struct CommandGetConfiguration: Codable {
 
 /// 输出解析器
 enum OutputParser: String, Codable {
-    case trim                // 去除首尾空白
-    case extractUrl          // 提取 URL
-    case extractDomain       // 提取域名
-    case firstLine           // 取第一行
-    case json                // JSON 解析
-    case regex               // 正则提取 (需配合 pattern)
+    case trim  // 去除首尾空白
+    case extractUrl  // 提取 URL
+    case extractDomain  // 提取域名
+    case firstLine  // 取第一行
+    case json  // JSON 解析
+    case regex  // 正则提取 (需配合 pattern)
 }
 
 // MARK: - XML 策略
@@ -575,10 +594,10 @@ enum JSONValue: Codable {
 
 /// 合并策略
 enum MergeStrategy: String, Codable {
-    case replace   // 替换整个值
-    case merge     // 合并对象
-    case append    // 追加到数组
-    case prepend   // 前置到数组
+    case replace  // 替换整个值
+    case merge  // 合并对象
+    case append  // 追加到数组
+    case prepend  // 前置到数组
 }
 
 // MARK: - Regex 策略
@@ -662,10 +681,10 @@ struct KeyValueGetConfiguration: Codable {
 
 /// 键值对文件格式
 enum KeyValueFormat: String, Codable {
-    case properties   // Java .properties 文件
-    case env          // .env 文件
-    case conf         // .conf 文件
-    case ini          // .ini 文件
+    case properties  // Java .properties 文件
+    case env  // .env 文件
+    case conf  // .conf 文件
+    case ini  // .ini 文件
 }
 
 // MARK: - 通用配置
@@ -711,7 +730,8 @@ struct TemplateVariableParser {
         let pattern = #"\{\{([^}]+)\}\}"#
         let regex = try NSRegularExpression(pattern: pattern)
 
-        let matches = regex.matches(in: template, range: NSRange(template.startIndex..., in: template))
+        let matches = regex.matches(
+            in: template, range: NSRange(template.startIndex..., in: template))
 
         for match in matches.reversed() {
             guard let range = Range(match.range(at: 1), in: template) else { continue }
@@ -729,7 +749,9 @@ struct TemplateVariableParser {
     }
 
     /// 从镜像源和上下文中提取变量
-    static func extractVariables(from source: SourceConfiguration, context: [String: Any]) -> [String: String] {
+    static func extractVariables(from source: SourceConfiguration, context: [String: Any])
+        -> [String: String]
+    {
         var variables: [String: String] = [:]
 
         // 基本变量
@@ -786,8 +808,8 @@ struct PostAction: Codable {
 /// 后置动作类型
 enum PostActionType: String, Codable {
     case showConfirmationDialog = "showConfirmationDialog"  // 显示确认对话框
-    case executeCommand = "executeCommand"                  // 执行命令
-    case notification = "notification"                      // 显示通知
+    case executeCommand = "executeCommand"  // 执行命令
+    case notification = "notification"  // 显示通知
 }
 
 /// 命令配置

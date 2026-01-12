@@ -40,7 +40,8 @@ class ConfigurationDrivenSourceManager {
     private var isInitialized = false
 
     /// 镜像源到配置源的映射
-    private var sourceToConfigSource: [String: (configSourceId: String, configSourceName: String)] = [:]
+    private var sourceToConfigSource: [String: (configSourceId: String, configSourceName: String)] =
+        [:]
 
     /// 镜像源可见性设置
     private var sourceVisibility: [String: Bool] = [:]
@@ -62,7 +63,29 @@ class ConfigurationDrivenSourceManager {
 
         print("🔄 正在初始化配置驱动管理器...")
 
-        // 加载配置
+        await withTaskGroup(of: Void.self) { group in
+            // 1. 加载配置
+            group.addTask {
+                await self.loadAndCacheConfiguration()
+            }
+
+            // 2. 加载可见性设置
+            group.addTask {
+                await self.loadSourceVisibility()
+            }
+        }
+
+        // 3. 加载选中状态 (依赖工具缓存，需在配置加载后执行)
+        loadCurrentSelection()
+
+        // 4. 检测当前实际使用的镜像源
+        await detectCurrentSources()
+
+        isInitialized = true
+        print("✓ ConfigurationDrivenSourceManager 初始化完成")
+    }
+
+    private func loadAndCacheConfiguration() async {
         do {
             toolsConfiguration = try await configLoader.loadConfiguration()
             buildToolCache()
@@ -70,22 +93,10 @@ class ConfigurationDrivenSourceManager {
         } catch {
             print("⚠️ 配置加载失败: \(error.localizedDescription)")
             // 使用内置默认配置
-            toolsConfiguration = configLoader.loadBuiltinConfiguration()
+            toolsConfiguration = await configLoader.loadBuiltinConfiguration()
             buildToolCache()
             print("✓ 使用内置默认配置")
         }
-
-        // 加载保存的选中状态
-        loadCurrentSelection()
-
-        // 加载镜像源可见性设置
-        loadSourceVisibility()
-
-        // 检测当前实际使用的镜像源
-        await detectCurrentSources()
-
-        isInitialized = true
-        print("✓ ConfigurationDrivenSourceManager 初始化完成")
     }
 
     /// 重新加载配置
@@ -108,26 +119,36 @@ class ConfigurationDrivenSourceManager {
 
     /// 获取按配置源分组的工具列表
     /// - Returns: [(ConfigSource, [ToolConfiguration])] - 配置源与其包含的工具
-    func getToolsGroupedByConfigSource() -> [(ConfigSource, [ToolConfiguration])] {
-        var result: [(ConfigSource, [ToolConfiguration])] = []
-
+    func getToolsGroupedByConfigSource() async -> [(ConfigSource, [ToolConfiguration])] {
         // 获取启用的配置源
         let enabledSources = ConfigSourceManager.shared.getEnabledSources()
 
-        // 为每个配置源加载独立的工具列表
-        for source in enabledSources {
-            if let tools = loadToolsFromConfigSource(source) {
-                result.append((source, tools))
+        // 直接从缓存中获取所有工具，并按配置源分组
+        var groupedTools: [String: [ToolConfiguration]] = [:]
+
+        for tool in cachedTools.values {
+            if let sourceId = tool.configSourceId {
+                groupedTools[sourceId, default: []].append(tool)
             }
         }
 
-        return result
+        // 按配置源顺序构建结果
+        var results: [(ConfigSource, [ToolConfiguration])] = []
+        for source in enabledSources {
+            if let tools = groupedTools[source.id.uuidString] {
+                // 对工具按名称排序，保证显示顺序一致
+                let sortedTools = tools.sorted { $0.name < $1.name }
+                results.append((source, sortedTools))
+            }
+        }
+
+        return results
     }
 
     /// 获取指定配置源的工具列表
     /// - Parameter configSourceId: 配置源 ID
     /// - Returns: 该配置源包含的工具列表，如果未找到返回 nil
-    func getTools(forConfigSource configSourceId: UUID) -> [ToolConfiguration]? {
+    func getTools(forConfigSource configSourceId: UUID) async -> [ToolConfiguration]? {
         // 获取启用的配置源
         let enabledSources = ConfigSourceManager.shared.getEnabledSources()
 
@@ -136,46 +157,47 @@ class ConfigurationDrivenSourceManager {
             return nil
         }
 
-        // 从该配置源加载工具（使用现有的私有方法）
-        return loadToolsFromConfigSource(source)
+        // 从该配置源加载工具
+        return await loadToolsFromConfigSource(source)
     }
 
     /// 从单个配置源加载工具列表（不去重）
     /// - Parameter source: 配置源
     /// - Returns: 工具配置列表
-    private func loadToolsFromConfigSource(_ source: ConfigSource) -> [ToolConfiguration]? {
+    private func loadToolsFromConfigSource(_ source: ConfigSource) async -> [ToolConfiguration]? {
         // 根据配置源类型加载
         switch source.type {
         case .builtin:
             // 内置配置：尝试从 Bundle 加载
-            if let config = loadBuiltinToolsConfig() {
+            if let config = await loadBuiltinToolsConfig() {
                 return annotateToolsWithConfigSource(tools: config.tools, source: source)
             }
 
             // Bundle 加载失败，使用硬编码的最小化配置作为后备
             debugLog("⚠️ Bundle 加载失败，使用硬编码的最小化内置配置（仅 npm）")
-            let fallbackConfig = configLoader.loadBuiltinConfiguration()
+            let fallbackConfig = await configLoader.loadBuiltinConfiguration()
             return annotateToolsWithConfigSource(tools: fallbackConfig.tools, source: source)
 
         case .local:
             // 本地文件：从文件路径加载
             guard let path = source.url else { return nil }
             let expandedPath = NSString(string: path).expandingTildeInPath
+            let url = URL(fileURLWithPath: expandedPath)
 
-            guard let data = try? Data(contentsOf: URL(fileURLWithPath: expandedPath)),
-                  let config = try? JSONDecoder().decode(ToolsConfiguration.self, from: data) else {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let config = try JSONDecoder().decode(ToolsConfiguration.self, from: data)
+                return annotateToolsWithConfigSource(tools: config.tools, source: source)
+            } catch {
+                debugLog("❌ 加载本地工具配置失败: \(error.localizedDescription)")
                 return nil
             }
-
-            return annotateToolsWithConfigSource(tools: config.tools, source: source)
 
         case .remote:
             // 远程配置：暂时跳过（需要异步加载）
             // TODO: 远程配置需要异步加载，这里暂时返回 nil
             return nil
         }
-
-        return nil
     }
 
     /// 为工具及其镜像源标记配置源信息
@@ -187,33 +209,56 @@ class ConfigurationDrivenSourceManager {
         tools: [ToolConfiguration],
         source: ConfigSource
     ) -> [ToolConfiguration] {
+        let sourceId = source.id.uuidString
+        let isBuiltin = (source.type == .builtin)
+
         return tools.map { tool in
-            // 为每个镜像源添加配置源信息
-            let annotatedSources = tool.sources.map { sourceConfig in
-                sourceConfig.withConfigSource(
-                    configSourceId: source.id.uuidString,
+            // 为每个镜像源添加配置源信息，并重写 ID 以确保唯一性
+            let annotatedSources = tool.sources.map { sourceConfig -> SourceConfiguration in
+                // 先更新配置源信息
+                var newSource = sourceConfig.withConfigSource(
+                    configSourceId: sourceId,
                     configSourceName: source.name,
-                    configSourceIsBuiltin: (source.type == .builtin)
+                    configSourceIsBuiltin: isBuiltin
                 )
+
+                // 重写镜像源 ID (配置源ID_原ID)
+                // 注意：这里需要 SourceConfiguration.id 是可变的或有方法修改
+                // 暂时假设我们通过新建实例修改，或者稍后修改模型
+                // 由于 SourceConfiguration 是不可变的 struct，我们需要如果它是 let id，需要修改模型
+                // 假设我们已经修改了模型让 id 是 var
+                newSource.id = "\(sourceId)_\(sourceConfig.id)"
+                return newSource
             }
 
             // 创建带有新镜像源列表的工具副本
-            return tool.withSources(annotatedSources)
+            var newTool = tool.withSources(annotatedSources)
+
+            // 重写工具 ID
+            newTool.originalId = tool.id
+            newTool.configSourceId = sourceId
+            newTool.id = "\(sourceId)_\(tool.id)"
+
+            return newTool
         }
     }
 
     /// 加载内置配置的工具部分（单独方法）
     /// - Returns: 工具配置
-    private func loadBuiltinToolsConfig() -> ToolsConfiguration? {
+    private func loadBuiltinToolsConfig() async -> ToolsConfiguration? {
         // 从 Bundle 中加载内置配置
         // 注意：这里假设内置配置文件名为 npm_mirror.json
-        guard let url = Bundle.main.url(forResource: "npm_mirror", withExtension: "json", subdirectory: "configs"),
-              let data = try? Data(contentsOf: url),
-              let config = try? JSONDecoder().decode(ToolsConfiguration.self, from: data) else {
-            return nil
-        }
-
-        return config
+        return await Task {
+            guard
+                let url = Bundle.main.url(
+                    forResource: "npm_mirror", withExtension: "json", subdirectory: "configs"),
+                let data = try? Data(contentsOf: url),
+                let config = try? JSONDecoder().decode(ToolsConfiguration.self, from: data)
+            else {
+                return nil
+            }
+            return config
+        }.value
     }
 
     // MARK: - 旧方法（向后兼容）
@@ -314,7 +359,8 @@ class ConfigurationDrivenSourceManager {
     /// 备份配置
     func backupConfig(for toolId: String) async throws {
         guard let tool = cachedTools[toolId],
-              let backup = tool.backup else {
+            let backup = tool.backup
+        else {
             throw SourceManagerError.backupNotSupported
         }
 
@@ -359,7 +405,7 @@ class ConfigurationDrivenSourceManager {
     }
 
     /// 测试指定工具的所有镜像源延迟
-    func testSpeed(sources: [MirrorSource]) async {
+    func testSpeed(sources: [MirrorSource], onUpdate: ((String, Int?) -> Void)? = nil) async {
         print("⚡️ 开始测速，共 \(sources.count) 个镜像源...")
 
         await withTaskGroup(of: (String, Int?).self) { group in
@@ -371,6 +417,8 @@ class ConfigurationDrivenSourceManager {
 
             for await (sourceId, pingTime) in group {
                 updatePingTime(sourceId: sourceId, pingTime: pingTime)
+                // 收到结果后立即回调
+                onUpdate?(sourceId, pingTime)
             }
         }
 
@@ -390,13 +438,18 @@ class ConfigurationDrivenSourceManager {
     /// 加载当前选中状态
     private func loadCurrentSelection() {
         // 从 ConfigManager 加载保存的选中状态
-        // 需要适配 ConfigManager 的接口
+        let selections = configManager.getAllSelections()
+
         for tool in cachedTools.values {
-            // 尝试映射到旧的 ToolType
-            if let toolType = ToolType(rawValue: tool.id) {
-                if let sourceId = configManager.getCurrentSelection(for: toolType) {
-                    currentSelection[tool.id] = sourceId
-                }
+            // 尝试直接通过 ID 获取
+            if let sourceId = selections[tool.id] {
+                currentSelection[tool.id] = sourceId
+            }
+            // 尝试映射到旧的 ToolType (为了兼容)
+            else if let toolType = ToolType(rawValue: tool.id),
+                let sourceId = selections[toolType.rawValue]
+            {
+                currentSelection[tool.id] = sourceId
             }
         }
     }
@@ -414,8 +467,12 @@ class ConfigurationDrivenSourceManager {
 
     /// 检测当前实际使用的镜像源
     private func detectCurrentSources() async {
-        for toolId in cachedTools.keys {
-            await detectCurrentSource(for: toolId)
+        await withTaskGroup(of: Void.self) { group in
+            for toolId in cachedTools.keys {
+                group.addTask {
+                    await self.detectCurrentSource(for: toolId)
+                }
+            }
         }
     }
 
@@ -447,7 +504,9 @@ class ConfigurationDrivenSourceManager {
     }
 
     /// 根据当前配置查找匹配的镜像源
-    private func findMatchingSource(for tool: ToolConfiguration, currentConfig: String) -> SourceConfiguration? {
+    private func findMatchingSource(for tool: ToolConfiguration, currentConfig: String)
+        -> SourceConfiguration?
+    {
         // 优先精确 URL 匹配
         for source in tool.sources {
             if currentConfig.contains(source.url) {
@@ -458,8 +517,9 @@ class ConfigurationDrivenSourceManager {
         // 如果没有精确匹配，尝试域名匹配
         for source in tool.sources {
             if let sourceDomain = extractDomain(from: source.url),
-               let currentDomain = extractDomain(from: currentConfig),
-               sourceDomain == currentDomain {
+                let currentDomain = extractDomain(from: currentConfig),
+                sourceDomain == currentDomain
+            {
                 return source
             }
         }
@@ -534,13 +594,15 @@ class ConfigurationDrivenSourceManager {
         let possibleBackupNames = [
             backup.backupFileName,  // JSON 配置中指定的名称
             ((filePath as NSString).lastPathComponent + ".original"),  // 旧的 BackupManager 格式
-            ("original_" + (filePath as NSString).lastPathComponent)  // 另一种可能的格式
+            ("original_" + (filePath as NSString).lastPathComponent),  // 另一种可能的格式
         ]
 
         var actualBackupPath: URL?
         for backupName in possibleBackupNames {
             let path = backupDir.appendingPathComponent(backupName)
-            print("🔍 [DEBUG] 检查备份文件: \(path.path), 存在: \(FileManager.default.fileExists(atPath: path.path))")
+            print(
+                "🔍 [DEBUG] 检查备份文件: \(path.path), 存在: \(FileManager.default.fileExists(atPath: path.path))"
+            )
             if FileManager.default.fileExists(atPath: path.path) {
                 actualBackupPath = path
                 break
@@ -586,7 +648,8 @@ class ConfigurationDrivenSourceManager {
         var context: [String: String] = [:]
 
         if case .command(let commandStrategy) = tool.strategy,
-           let preCommands = commandStrategy.set.preCommands {
+            let preCommands = commandStrategy.set.preCommands
+        {
             for preCommand in preCommands {
                 do {
                     let result = try await ShellExecutor.execute(
@@ -661,19 +724,21 @@ class ConfigurationDrivenSourceManager {
     }
 
     /// 加载镜像源可见性设置
-    private func loadSourceVisibility() {
+    private func loadSourceVisibility() async {
         let filePath = getConfigSourceVisibilityFilePath()
         guard FileManager.default.fileExists(atPath: filePath.path) else {
             return
         }
 
-        guard let data = try? Data(contentsOf: filePath),
-              let visibility = try? JSONDecoder().decode([String: Bool].self, from: data) else {
-            return
+        do {
+            let (data, _) = try await URLSession.shared.data(from: filePath)
+            if let visibility = try? JSONDecoder().decode([String: Bool].self, from: data) {
+                sourceVisibility = visibility
+                debugLog("✓ 镜像源可见性已加载")
+            }
+        } catch {
+            print("⚠️ 镜像源可见性加载失败: \(error.localizedDescription)")
         }
-
-        sourceVisibility = visibility
-        debugLog("✓ 镜像源可见性已加载")
     }
 
     /// 获取镜像源可见性配置文件路径
@@ -704,7 +769,8 @@ class ConfigurationDrivenSourceManager {
             }
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         case .firstLine:
-            return output.components(separatedBy: .newlines).first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? output
+            return output.components(separatedBy: .newlines).first?.trimmingCharacters(
+                in: .whitespacesAndNewlines) ?? output
         case .json:
             // JSON 解析（返回原始输出，稍后处理）
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
