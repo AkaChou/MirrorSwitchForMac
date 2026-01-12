@@ -165,7 +165,8 @@ class ConfigManagementWindow: NSWindowController {
         buttonContainer.addSubview(removeButton)
 
         // 刷新按钮
-        refreshButton = NSButton(title: "↻ 刷新", target: self, action: #selector(refreshButtonClicked))
+        refreshButton = NSButton(
+            title: "↻ 刷新", target: self, action: #selector(refreshButtonClicked))
         refreshButton.bezelStyle = .rounded
         refreshButton.translatesAutoresizingMaskIntoConstraints = false
         buttonContainer.addSubview(refreshButton)
@@ -183,7 +184,9 @@ class ConfigManagementWindow: NSWindowController {
         contentView.addSubview(addConfigLabel)
 
         // 类型选择
-        typeSegmentedControl = NSSegmentedControl(labels: ["本地文件", "远程 URL"], trackingMode: .selectOne, target: self, action: #selector(typeChanged))
+        typeSegmentedControl = NSSegmentedControl(
+            labels: ["本地文件", "远程 URL"], trackingMode: .selectOne, target: self,
+            action: #selector(typeChanged))
         typeSegmentedControl.selectedSegment = 0
         typeSegmentedControl.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(typeSegmentedControl)
@@ -195,34 +198,39 @@ class ConfigManagementWindow: NSWindowController {
 
         nameTextField = NSTextField()
         nameTextField.placeholderString = "例如: 我的 Maven 配置"
-        nameTextField.isEditable = true        // 明确设置为可编辑
-        nameTextField.isSelectable = true      // 允许选择文本
+        nameTextField.isEditable = true  // 明确设置为可编辑
+        nameTextField.isSelectable = true  // 允许选择文本
         nameTextField.allowsEditingTextAttributes = false  // 禁用富文本编辑
         nameTextField.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(nameTextField)
 
         // URL/路径输入
-        let urlLabel = NSTextField(labelWithString: typeSegmentedControl.selectedSegment == 0 ? "路径:" : "URL:")
+        let urlLabel = NSTextField(
+            labelWithString: typeSegmentedControl.selectedSegment == 0 ? "路径:" : "URL:")
         urlLabel.translatesAutoresizingMaskIntoConstraints = false
         urlLabel.identifier = NSUserInterfaceItemIdentifier("urlLabel")
         contentView.addSubview(urlLabel)
 
         urlTextField = NSTextField()
-        urlTextField.placeholderString = typeSegmentedControl.selectedSegment == 0 ? "~/Documents/config.json" : "https://example.com/config.json"
-        urlTextField.isEditable = true         // 明确设置为可编辑
-        urlTextField.isSelectable = true       // 允许选择文本
+        urlTextField.placeholderString =
+            typeSegmentedControl.selectedSegment == 0
+            ? "~/Documents/config.json" : "https://example.com/config.json"
+        urlTextField.isEditable = true  // 明确设置为可编辑
+        urlTextField.isSelectable = true  // 允许选择文本
         urlTextField.allowsEditingTextAttributes = false
         urlTextField.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(urlTextField)
 
         // 浏览按钮
-        browseButton = NSButton(title: "浏览...", target: self, action: #selector(browseButtonClicked))
+        browseButton = NSButton(
+            title: "浏览...", target: self, action: #selector(browseButtonClicked))
         browseButton.bezelStyle = .rounded
         browseButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(browseButton)
 
         // 添加配置按钮（表单中的添加按钮）
-        let addConfigButton = NSButton(title: "+ 添加配置", target: self, action: #selector(saveButtonClicked))
+        let addConfigButton = NSButton(
+            title: "+ 添加配置", target: self, action: #selector(saveButtonClicked))
         addConfigButton.bezelStyle = .rounded
         addConfigButton.keyEquivalent = "\r"  // 支持 Enter 键
         addConfigButton.translatesAutoresizingMaskIntoConstraints = false
@@ -264,7 +272,8 @@ class ConfigManagementWindow: NSWindowController {
         toolVisibilityScrollView.documentView = toolVisibilityTableView
 
         // 列：可见性复选框
-        let toolVisibleColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("toolVisible"))
+        let toolVisibleColumn = NSTableColumn(
+            identifier: NSUserInterfaceItemIdentifier("toolVisible"))
         toolVisibleColumn.headerCell.stringValue = "显示"
         toolVisibleColumn.width = 50
         toolVisibilityTableView.addTableColumn(toolVisibleColumn)
@@ -284,13 +293,16 @@ class ConfigManagementWindow: NSWindowController {
             // 表格
             scrollView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10),
             scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            scrollView.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
             scrollView.heightAnchor.constraint(equalToConstant: 200),
 
             // 按钮容器
             buttonContainer.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 10),
-            buttonContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            buttonContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            buttonContainer.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
+            buttonContainer.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
             buttonContainer.heightAnchor.constraint(equalToConstant: 30),
 
             // 按钮
@@ -300,7 +312,8 @@ class ConfigManagementWindow: NSWindowController {
             removeButton.leadingAnchor.constraint(equalTo: addButton.trailingAnchor, constant: 10),
             removeButton.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
 
-            refreshButton.leadingAnchor.constraint(equalTo: removeButton.trailingAnchor, constant: 10),
+            refreshButton.leadingAnchor.constraint(
+                equalTo: removeButton.trailingAnchor, constant: 10),
             refreshButton.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
 
             // 分隔线
@@ -310,11 +323,14 @@ class ConfigManagementWindow: NSWindowController {
 
             // 添加配置源标签
             addConfigLabel.topAnchor.constraint(equalTo: separator.bottomAnchor, constant: 15),
-            addConfigLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            addConfigLabel.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
 
             // 类型选择
-            typeSegmentedControl.topAnchor.constraint(equalTo: addConfigLabel.bottomAnchor, constant: 10),
-            typeSegmentedControl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            typeSegmentedControl.topAnchor.constraint(
+                equalTo: addConfigLabel.bottomAnchor, constant: 10),
+            typeSegmentedControl.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
             typeSegmentedControl.widthAnchor.constraint(equalToConstant: 200),
 
             // 名称标签 - 使用 centerYAnchor 与输入框对齐
@@ -323,9 +339,11 @@ class ConfigManagementWindow: NSWindowController {
             nameLabel.widthAnchor.constraint(equalToConstant: 50),
 
             // 名称输入框
-            nameTextField.topAnchor.constraint(equalTo: typeSegmentedControl.bottomAnchor, constant: 15),
+            nameTextField.topAnchor.constraint(
+                equalTo: typeSegmentedControl.bottomAnchor, constant: 15),
             nameTextField.leadingAnchor.constraint(equalTo: nameLabel.trailingAnchor, constant: 10),
-            nameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            nameTextField.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
             nameTextField.heightAnchor.constraint(equalToConstant: 24),
 
             // URL 标签 - 使用 centerYAnchor 与输入框对齐
@@ -336,38 +354,53 @@ class ConfigManagementWindow: NSWindowController {
             // URL 输入框
             urlTextField.topAnchor.constraint(equalTo: nameTextField.bottomAnchor, constant: 10),
             urlTextField.leadingAnchor.constraint(equalTo: urlLabel.trailingAnchor, constant: 10),
-            urlTextField.trailingAnchor.constraint(equalTo: browseButton.leadingAnchor, constant: -10),
+            urlTextField.trailingAnchor.constraint(
+                equalTo: browseButton.leadingAnchor, constant: -10),
             urlTextField.heightAnchor.constraint(equalToConstant: 24),
 
             // 浏览按钮
             browseButton.centerYAnchor.constraint(equalTo: urlTextField.centerYAnchor),
-            browseButton.trailingAnchor.constraint(equalTo: addConfigButton.leadingAnchor, constant: -10),
+            browseButton.trailingAnchor.constraint(
+                equalTo: addConfigButton.leadingAnchor, constant: -10),
             browseButton.widthAnchor.constraint(equalToConstant: 80),
 
             // 添加配置按钮（与浏览按钮在同一行）
             addConfigButton.centerYAnchor.constraint(equalTo: urlTextField.centerYAnchor),
-            addConfigButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            addConfigButton.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
             addConfigButton.widthAnchor.constraint(equalToConstant: 100),
 
             // 工具可见性分隔线
-            toolVisibilitySeparator.topAnchor.constraint(equalTo: addConfigButton.bottomAnchor, constant: 20),
-            toolVisibilitySeparator.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            toolVisibilitySeparator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            toolVisibilitySeparator.topAnchor.constraint(
+                equalTo: addConfigButton.bottomAnchor, constant: 20),
+            toolVisibilitySeparator.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
+            toolVisibilitySeparator.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
 
             // 工具可见性标题
-            toolVisibilityLabel.topAnchor.constraint(equalTo: toolVisibilitySeparator.bottomAnchor, constant: 15),
-            toolVisibilityLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            toolVisibilityLabel.topAnchor.constraint(
+                equalTo: toolVisibilitySeparator.bottomAnchor, constant: 15),
+            toolVisibilityLabel.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
 
             // 工具可见性说明
-            toolVisibilityHint.topAnchor.constraint(equalTo: toolVisibilityLabel.bottomAnchor, constant: 5),
-            toolVisibilityHint.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            toolVisibilityHint.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            toolVisibilityHint.topAnchor.constraint(
+                equalTo: toolVisibilityLabel.bottomAnchor, constant: 5),
+            toolVisibilityHint.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
+            toolVisibilityHint.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
 
             // 工具可见性滚动视图
-            toolVisibilityScrollView.topAnchor.constraint(equalTo: toolVisibilityHint.bottomAnchor, constant: 10),
-            toolVisibilityScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            toolVisibilityScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            toolVisibilityScrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+            toolVisibilityScrollView.topAnchor.constraint(
+                equalTo: toolVisibilityHint.bottomAnchor, constant: 10),
+            toolVisibilityScrollView.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
+            toolVisibilityScrollView.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
+            toolVisibilityScrollView.bottomAnchor.constraint(
+                equalTo: contentView.bottomAnchor, constant: -20),
             toolVisibilityScrollView.heightAnchor.constraint(equalToConstant: 150),
         ])
     }
@@ -384,12 +417,20 @@ class ConfigManagementWindow: NSWindowController {
 
     /// 加载工具列表（从选中的配置源）
     private func loadToolsList() {
-        // 如果有选中的配置源，只加载该配置源的工具
-        if let configSourceId = selectedConfigSourceId {
-            toolsList = ConfigurationDrivenSourceManager.shared.getTools(forConfigSource: configSourceId) ?? []
-        } else {
-            // 如果没有选中配置源，显示空列表
-            toolsList = []
+        Task {
+            // 如果有选中的配置源，只加载该配置源的工具
+            if let configSourceId = selectedConfigSourceId {
+                let fetchedTools =
+                    await ConfigurationDrivenSourceManager.shared.getTools(
+                        forConfigSource: configSourceId) ?? []
+                self.toolsList = fetchedTools
+            } else {
+                // 如果没有选中配置源，显示空列表
+                self.toolsList = []
+            }
+
+            // 刷新表格
+            self.toolVisibilityTableView.reloadData()
         }
     }
 
@@ -398,13 +439,12 @@ class ConfigManagementWindow: NSWindowController {
         // 重新加载工具列表（确保显示最新的工具）
         loadToolsList()
 
-        // 重新加载表格数据
-        toolVisibilityTableView.reloadData()
-
         // 更新说明文本
         if let source = selectedConfigSource {
             // 查找说明文本字段
-            if let hintView = self.window?.contentView?.subviews.first(where: { ($0 as? NSTextField)?.stringValue.contains("选中一个配置源") ?? false }) as? NSTextField {
+            if let hintView = self.window?.contentView?.subviews.first(where: {
+                ($0 as? NSTextField)?.stringValue.contains("选中一个配置源") ?? false
+            }) as? NSTextField {
                 hintView.stringValue = "配置源「\(source.name)」包含以下工具，勾选要在一级菜单中显示的工具"
             }
         }
@@ -451,11 +491,14 @@ class ConfigManagementWindow: NSWindowController {
         let isLocal = typeSegmentedControl.selectedSegment == 0
 
         // 更新 URL 标签和占位符
-        if let urlLabel = self.window!.contentView?.subviews.first(where: { ($0 as? NSTextField)?.identifier?.rawValue == "urlLabel" }) as? NSTextField {
+        if let urlLabel = self.window!.contentView?.subviews.first(where: {
+            ($0 as? NSTextField)?.identifier?.rawValue == "urlLabel"
+        }) as? NSTextField {
             urlLabel.stringValue = isLocal ? "路径:" : "URL:"
         }
 
-        urlTextField.placeholderString = isLocal
+        urlTextField.placeholderString =
+            isLocal
             ? "~/Documents/maven_mirror.json"
             : "https://example.com/maven_mirror.json"
     }
@@ -590,33 +633,43 @@ extension ConfigManagementWindow: NSTableViewDataSource {
 // MARK: - NSTableViewDelegate
 
 extension ConfigManagementWindow: NSTableViewDelegate {
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int)
+        -> NSView?
+    {
         // 处理工具可见性表格
         if tableView == toolVisibilityTableView {
             // 如果没有选中配置源，显示提示信息
             if selectedConfigSourceId == nil {
-                guard let cellView = tableView.makeView(
-                    withIdentifier: NSUserInterfaceItemIdentifier("toolEmptyHint"),
-                    owner: self
-                ) as? NSTableCellView else {
-                    // 创建提示单元格
-                    let cellView = NSTableCellView()
-                    cellView.identifier = NSUserInterfaceItemIdentifier("toolEmptyHint")
+                // 只在"工具名称"列显示提示
+                if tableColumn?.identifier.rawValue == "toolName" {
+                    guard
+                        let cellView = tableView.makeView(
+                            withIdentifier: NSUserInterfaceItemIdentifier("toolEmptyHint"),
+                            owner: self
+                        ) as? NSTableCellView
+                    else {
+                        // 创建提示单元格
+                        let cellView = NSTableCellView()
+                        cellView.identifier = NSUserInterfaceItemIdentifier("toolEmptyHint")
 
-                    let textField = NSTextField(labelWithString: "请先在上方选择一个配置源")
-                    textField.textColor = .secondaryLabelColor
-                    textField.font = NSFont.systemFont(ofSize: 13)
-                    textField.translatesAutoresizingMaskIntoConstraints = false
-                    cellView.addSubview(textField)
+                        let textField = NSTextField(labelWithString: "请先在上方选择一个配置源")
+                        textField.textColor = .secondaryLabelColor
+                        textField.font = NSFont.systemFont(ofSize: 13)
+                        textField.translatesAutoresizingMaskIntoConstraints = false
+                        cellView.addSubview(textField)
 
-                    NSLayoutConstraint.activate([
-                        textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                        textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 10)
-                    ])
+                        NSLayoutConstraint.activate([
+                            textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                            textField.leadingAnchor.constraint(
+                                equalTo: cellView.leadingAnchor, constant: 10),
+                        ])
 
+                        return cellView
+                    }
                     return cellView
                 }
-                return cellView
+                // 其他列显示空白
+                return nil
             }
 
             guard row < toolsList.count else { return nil }
@@ -626,11 +679,14 @@ extension ConfigManagementWindow: NSTableViewDelegate {
 
             switch columnId {
             case "toolVisible":
-                let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(toolVisibilityCheckboxClicked(_:)))
+                let checkbox = NSButton(
+                    checkboxWithTitle: "", target: self,
+                    action: #selector(toolVisibilityCheckboxClicked(_:)))
                 // 获取当前配置源中此工具的可见性
-                let isVisible = ConfigSourceManager.shared.getToolVisibility(
-                    configSourceId: selectedConfigSource!.id,
-                    toolId: tool.id
+                let isVisible = ConfigSourceManager.shared.isToolVisibleInMenu(
+                    toolId: tool.id,
+                    originalId: tool.originalId,
+                    configSourceId: selectedConfigSource!.id
                 )
                 checkbox.state = isVisible ? .on : .off
                 checkbox.identifier = NSUserInterfaceItemIdentifier(tool.id)
@@ -643,7 +699,8 @@ extension ConfigManagementWindow: NSTableViewDelegate {
                 textField.translatesAutoresizingMaskIntoConstraints = false
                 NSLayoutConstraint.activate([
                     textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                    textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5)
+                    textField.leadingAnchor.constraint(
+                        equalTo: cellView.leadingAnchor, constant: 5),
                 ])
                 return cellView
 
@@ -660,7 +717,8 @@ extension ConfigManagementWindow: NSTableViewDelegate {
 
         switch columnId {
         case "enabled":
-            let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(enabledCheckboxClicked(_:)))
+            let checkbox = NSButton(
+                checkboxWithTitle: "", target: self, action: #selector(enabledCheckboxClicked(_:)))
             checkbox.state = source.isEnabled ? .on : .off
             checkbox.identifier = NSUserInterfaceItemIdentifier(source.id.uuidString)
             // 内置配置可以启用/禁用
@@ -668,12 +726,13 @@ extension ConfigManagementWindow: NSTableViewDelegate {
 
         case "type":
             let cellView = NSTableCellView()
-            let textField = NSTextField(labelWithString: "\(source.type.icon) \(source.type.displayName)")
+            let textField = NSTextField(
+                labelWithString: "\(source.type.icon) \(source.type.displayName)")
             cellView.addSubview(textField)
             textField.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5)
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5),
             ])
             return cellView
 
@@ -684,13 +743,14 @@ extension ConfigManagementWindow: NSTableViewDelegate {
             textField.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5)
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5),
             ])
             return cellView
 
         case "url":
             let cellView = NSTableCellView()
-            let textField = NSTextField(labelWithString: source.url ?? (source.type == .builtin ? "-" : ""))
+            let textField = NSTextField(
+                labelWithString: source.url ?? (source.type == .builtin ? "-" : ""))
             textField.textColor = .secondaryLabelColor
             textField.font = NSFont.systemFont(ofSize: 12)
             cellView.addSubview(textField)
@@ -698,18 +758,19 @@ extension ConfigManagementWindow: NSTableViewDelegate {
             NSLayoutConstraint.activate([
                 textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
                 textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5),
-                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -5)
+                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -5),
             ])
             return cellView
 
         case "status":
             let cellView = NSTableCellView()
-            let textField = NSTextField(labelWithString: "\(source.status.icon) \(source.status.displayName)")
+            let textField = NSTextField(
+                labelWithString: "\(source.status.icon) \(source.status.displayName)")
             cellView.addSubview(textField)
             textField.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5)
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5),
             ])
             return cellView
 
@@ -720,7 +781,8 @@ extension ConfigManagementWindow: NSTableViewDelegate {
 
     @objc private func enabledCheckboxClicked(_ sender: NSButton) {
         guard let uuidString = sender.identifier?.rawValue,
-              let uuid = UUID(uuidString: uuidString) else {
+            let uuid = UUID(uuidString: uuidString)
+        else {
             return
         }
 
@@ -749,7 +811,8 @@ extension ConfigManagementWindow: NSTableViewDelegate {
     /// 工具可见性复选框点击事件
     @objc private func toolVisibilityCheckboxClicked(_ sender: NSButton) {
         guard let toolId = sender.identifier?.rawValue,
-              let source = selectedConfigSource else {
+            let source = selectedConfigSource
+        else {
             return
         }
 

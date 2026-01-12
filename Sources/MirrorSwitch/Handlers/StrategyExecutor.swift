@@ -6,8 +6,8 @@
 //  支持 command、xml、jsonpath、regex、keyvalue 五种策略
 //
 
-import Foundation
 import AEXML
+import Foundation
 
 /// 策略执行器
 actor StrategyExecutor {
@@ -180,7 +180,8 @@ actor StrategyExecutor {
         )
 
         // 使用正则表达式直接替换 XML 中的值（保持格式不变）
-        content = try replaceXMLValue(xmlContent: content, xpath: strategy.set.xpath, newValue: value)
+        content = try replaceXMLValue(
+            xmlContent: content, xpath: strategy.set.xpath, newValue: value)
 
         // 写回文件
         try content.write(toFile: filePath, atomically: true, encoding: .utf8)
@@ -370,7 +371,9 @@ actor StrategyExecutor {
         var found = false
         for i in 0..<lines.count {
             let line = lines[i]
-            if line.hasPrefix(strategy.set.key + separator) || line.hasPrefix(strategy.set.key + " ") {
+            if line.hasPrefix(strategy.set.key + separator)
+                || line.hasPrefix(strategy.set.key + " ")
+            {
                 lines[i] = "\(strategy.set.key)\(separator)\(value)"
                 if let comment = strategy.set.comment {
                     lines[i] = "\(comment)\n\(lines[i])"
@@ -409,9 +412,12 @@ actor StrategyExecutor {
 
         let separator = strategy.get.separator ?? "="
         for line in lines {
-            if line.hasPrefix(strategy.get.key + separator) || line.hasPrefix(strategy.get.key + " ") {
+            if line.hasPrefix(strategy.get.key + separator)
+                || line.hasPrefix(strategy.get.key + " ")
+            {
                 if let range = line.range(of: separator) {
-                    let value = String(line[range.upperBound...]).trimmingCharacters(in: CharacterSet.whitespaces)
+                    let value = String(line[range.upperBound...]).trimmingCharacters(
+                        in: CharacterSet.whitespaces)
                     return value
                 }
             }
@@ -446,7 +452,9 @@ actor StrategyExecutor {
                 result = String(result[urlRange])
             }
         case .extractDomain:
-            if let url = URL(string: result.trimmingCharacters(in: .whitespaces)), let host = url.host {
+            if let url = URL(string: result.trimmingCharacters(in: .whitespaces)),
+                let host = url.host
+            {
                 result = host
             }
         case .firstLine:
@@ -464,7 +472,7 @@ actor StrategyExecutor {
         var expandedPath = (path as NSString).expandingTildeInPath
 
         // 2. 检查是否有用户手动选择的路径
-        if let customPath = await ConfigManager.shared.getCustomPath(for: tool.id) {
+        if let customPath = ConfigManager.shared.getCustomPath(for: tool.id) {
             debugLog("🔍 检测到自定义路径: \(customPath)")
 
             // 如果是默认的配置文件路径，尝试在自定义路径下查找配置文件
@@ -554,7 +562,9 @@ actor StrategyExecutor {
     ///   - xpath: XPath 路径，如 //mirrors/mirror/url
     ///   - newValue: 新值
     /// - Returns: 替换后的 XML 内容
-    private func replaceXMLValue(xmlContent: String, xpath: String, newValue: String) throws -> String {
+    private func replaceXMLValue(xmlContent: String, xpath: String, newValue: String) throws
+        -> String
+    {
         // 解析 XPath，如 //mirrors/mirror/url
         let parts = xpath.components(separatedBy: "/").filter { !$0.isEmpty }
 
@@ -593,7 +603,10 @@ actor StrategyExecutor {
             // 添加目标元素
             pattern += "[\\s\\S]*?<\(targetElement)>([\\s\\S]*?)</\(targetElement)>"
 
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else {
+            guard
+                let regex = try? NSRegularExpression(
+                    pattern: pattern, options: [.dotMatchesLineSeparators])
+            else {
                 throw SourceManagerError.parseFailed("构建正则表达式失败")
             }
 
@@ -604,13 +617,14 @@ actor StrategyExecutor {
                 let valueRange = match.range(at: 1)
                 if let range = Range(valueRange, in: xmlContent) {
                     // 替换值
-                    let oldValue = String(xmlContent[range])
+                    _ = String(xmlContent[range])
                     let location = valueRange.location
                     let length = valueRange.length
 
                     // 构建新的内容
                     let nsRange = NSRange(location: location, length: length)
-                    result = (xmlContent as NSString).replacingCharacters(in: nsRange, with: newValue)
+                    result = (xmlContent as NSString).replacingCharacters(
+                        in: nsRange, with: newValue)
                     found = true
                 }
             }
@@ -618,7 +632,10 @@ actor StrategyExecutor {
             // 没有父路径，直接匹配目标元素
             let pattern = "<\(targetElement)>([\\s\\S]*?)</\(targetElement)>"
 
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else {
+            guard
+                let regex = try? NSRegularExpression(
+                    pattern: pattern, options: [.dotMatchesLineSeparators])
+            else {
                 throw SourceManagerError.parseFailed("构建正则表达式失败")
             }
 
@@ -627,13 +644,14 @@ actor StrategyExecutor {
 
             if let match = matches.last, match.numberOfRanges > 1 {
                 let valueRange = match.range(at: 1)
-                if let range = Range(valueRange, in: xmlContent) {
+                if Range(valueRange, in: xmlContent) != nil {
                     let location = valueRange.location
                     let length = valueRange.length
 
                     // 构建新的内容
                     let nsRange = NSRange(location: location, length: length)
-                    result = (xmlContent as NSString).replacingCharacters(in: nsRange, with: newValue)
+                    result = (xmlContent as NSString).replacingCharacters(
+                        in: nsRange, with: newValue)
                     found = true
                 }
             }
@@ -654,7 +672,7 @@ actor StrategyExecutor {
         var element = document.root
 
         // 遍历路径
-        for part in parts.dropFirst() { // 跳过根节点的 //
+        for part in parts.dropFirst() {  // 跳过根节点的 //
             let cleanPart = part.components(separatedBy: "[").first ?? part
 
             // 查找子元素

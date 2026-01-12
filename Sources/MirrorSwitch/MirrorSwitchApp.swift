@@ -81,7 +81,7 @@ private enum LayoutConstants {
 /// 后置动作触发时机
 enum PostActionTrigger {
     case onSourceChanged  // 切换镜像源后
-    case onReset          // 重置为默认配置后
+    case onReset  // 重置为默认配置后
 }
 
 /// 颜色阈值常量（毫秒）
@@ -134,7 +134,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugLog("⚡️ 开始自动测速...")
                 for toolId in toolVersions.keys {
                     // 延迟一点避免同时发起太多请求
-                    try? await Task.sleep(nanoseconds: UInt64(100_000_000)) // 0.1 秒
+                    try? await Task.sleep(nanoseconds: UInt64(100_000_000))  // 0.1 秒
                     menuUpdateHelper?.startSpeedTest(for: toolId)
                 }
             }
@@ -157,8 +157,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let button = statusItem?.button {
             // 从配置获取菜单图标
             let iconConfig = AppConfigManager.shared.menuBarIcon
-            if let image = NSImage(systemSymbolName: iconConfig.systemSymbolName,
-                                   accessibilityDescription: AppConfigManager.shared.appDisplayName) {
+            if let image = NSImage(
+                systemSymbolName: iconConfig.systemSymbolName,
+                accessibilityDescription: AppConfigManager.shared.appDisplayName)
+            {
                 button.image = image
             } else {
                 button.title = "⚡️"
@@ -227,7 +229,9 @@ class MenuUpdateHelper: NSObject {
     /// 处理配置源变更
     private func handleConfigSourcesChange() {
         debouncer.debounce { [weak self] in
-            self?.performConfigReload()
+            Task { @MainActor in
+                self?.performConfigReload()
+            }
         }
     }
 
@@ -303,11 +307,24 @@ class MenuUpdateHelper: NSObject {
     func buildMenu() {
         guard let statusItem = statusItem else { return }
 
+        Task {
+            // 改为按配置源分组 (异步获取)
+            let groupedTools = await ConfigurationDrivenSourceManager.shared
+                .getToolsGroupedByConfigSource()
+
+            // 在主线程更新 UI
+            await MainActor.run {
+                self.updateMenuWithTools(groupedTools)
+            }
+        }
+    }
+
+    /// 根据工具列表构建菜单（拆分出来的同步方法）
+    private func updateMenuWithTools(_ groupedTools: [(ConfigSource, [ToolConfiguration])]) {
+        guard let statusItem = statusItem else { return }
+
         let menu = NSMenu()
         menu.delegate = self
-
-        // 改为按配置源分组
-        let groupedTools = ConfigurationDrivenSourceManager.shared.getToolsGroupedByConfigSource()
 
         for (configSource, tools) in groupedTools {
             // 先收集该配置源下所有可见的工具
@@ -317,10 +334,13 @@ class MenuUpdateHelper: NSObject {
                 let toolId = toolConfig.id
 
                 // 检查工具可见性（考虑配置源的设置）
-                guard ConfigSourceManager.shared.isToolVisibleInMenu(
-                    toolId: toolId,
-                    configSourceId: configSource.id
-                ) else {
+                guard
+                    ConfigSourceManager.shared.isToolVisibleInMenu(
+                        toolId: toolId,
+                        originalId: toolConfig.originalId,
+                        configSourceId: configSource.id
+                    )
+                else {
                     debugLog("⏭️  跳过工具 \(toolConfig.name)（已在配置中隐藏）")
                     continue
                 }
@@ -365,7 +385,9 @@ class MenuUpdateHelper: NSObject {
                 let formattedVersion = toolVersions[toolConfig.id].flatMap { formatVersion($0) }
 
                 let menuItemView = MenuItemView(
-                    frame: NSRect(x: 0, y: 0, width: LayoutConstants.primaryMenuWidth, height: LayoutConstants.primaryMenuHeight),
+                    frame: NSRect(
+                        x: 0, y: 0, width: LayoutConstants.primaryMenuWidth,
+                        height: LayoutConstants.primaryMenuHeight),
                     toolName: displayName,
                     version: formattedVersion,
                     sourceName: currentSource?.name ?? "未选择"
@@ -423,7 +445,9 @@ class MenuUpdateHelper: NSObject {
         debugLog("🏗️ 创建 SpeedTestView: tool=\(toolConfig.name), hash=\(toolHash)")
 
         let testSpeedView = SpeedTestView(
-            frame: NSRect(x: 0, y: 0, width: LayoutConstants.viewWidth, height: LayoutConstants.speedTestViewHeight),
+            frame: NSRect(
+                x: 0, y: 0, width: LayoutConstants.viewWidth,
+                height: LayoutConstants.speedTestViewHeight),
             toolName: toolConfig.name,
             toolHash: toolHash,
             isTesting: testingTools.contains(toolId)
@@ -449,7 +473,9 @@ class MenuUpdateHelper: NSObject {
 
         for source in sources {
             let sourceItemView = MirrorSourceItemView(
-                frame: NSRect(x: 0, y: 0, width: LayoutConstants.viewWidth, height: LayoutConstants.sourceItemViewHeight),
+                frame: NSRect(
+                    x: 0, y: 0, width: LayoutConstants.viewWidth,
+                    height: LayoutConstants.sourceItemViewHeight),
                 source: source,
                 toolId: toolId,
                 toolName: toolConfig.name
@@ -480,7 +506,9 @@ class MenuUpdateHelper: NSObject {
         let customPath = ConfigManager.shared.getCustomPath(for: toolId)
 
         let customPathView = CustomPathView(
-            frame: NSRect(x: 0, y: 0, width: LayoutConstants.viewWidth, height: LayoutConstants.speedTestViewHeight),
+            frame: NSRect(
+                x: 0, y: 0, width: LayoutConstants.viewWidth,
+                height: LayoutConstants.speedTestViewHeight),
             toolId: toolId,
             currentPath: customPath
         )
@@ -495,7 +523,9 @@ class MenuUpdateHelper: NSObject {
 
         // 打开配置文件目录
         let openConfigDirView = OpenConfigDirView(
-            frame: NSRect(x: 0, y: 0, width: LayoutConstants.viewWidth, height: LayoutConstants.speedTestViewHeight),
+            frame: NSRect(
+                x: 0, y: 0, width: LayoutConstants.viewWidth,
+                height: LayoutConstants.speedTestViewHeight),
             toolId: toolId
         )
         openConfigDirView.onAction = { [weak self] toolId in
@@ -507,7 +537,10 @@ class MenuUpdateHelper: NSObject {
         menu.addItem(openConfigDirItem)
 
         // 重置按钮
-        let resetButtonView = ResetButtonView(frame: NSRect(x: 0, y: 0, width: LayoutConstants.viewWidth, height: LayoutConstants.speedTestViewHeight))
+        let resetButtonView = ResetButtonView(
+            frame: NSRect(
+                x: 0, y: 0, width: LayoutConstants.viewWidth,
+                height: LayoutConstants.speedTestViewHeight))
         resetButtonView.onAction = { [weak self] in
             self?.resetToDefault(for: toolId)
         }
@@ -572,7 +605,14 @@ class MenuUpdateHelper: NSObject {
         Task {
             debugLog("⚡️ 后台测速任务开始")
             let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
-            await ConfigurationDrivenSourceManager.shared.testSpeed(sources: sources)
+            await ConfigurationDrivenSourceManager.shared.testSpeed(
+                sources: sources,
+                onUpdate: { _, _ in
+                    // 收到每个测速结果时，立即更新列表 UI
+                    // 注意：testSpeed 在 MainActor 上运行回调，所以可以直接更新 UI
+                    self.updateSourceList(for: toolId)
+                }
+            )
             debugLog("⚡️ 后台测速任务完成")
 
             await MainActor.run {
@@ -705,7 +745,8 @@ class MenuUpdateHelper: NSObject {
 
         Task {
             do {
-                try await ConfigurationDrivenSourceManager.shared.switchSource(toolId: toolId, source: source)
+                try await ConfigurationDrivenSourceManager.shared.switchSource(
+                    toolId: toolId, source: source)
                 await MainActor.run {
                     // 根据工具 ID 查找对应的组合键
                     if let uniqueKey = self.findKeyForTool(toolId) {
@@ -733,8 +774,10 @@ class MenuUpdateHelper: NSObject {
     ///   - sourceId: 镜像源 ID
     ///   - toolId: 工具 ID
     private func toggleSourceVisibility(sourceId: String, toolId: String) {
-        guard let source = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
-                .first(where: { $0.id == sourceId }) else {
+        guard
+            let source = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
+                .first(where: { $0.id == sourceId })
+        else {
             return
         }
 
@@ -754,7 +797,8 @@ class MenuUpdateHelper: NSObject {
     /// 关闭当前打开的菜单
     private func closeMenu() {
         guard let statusItem = statusItem,
-              let menu = statusItem.menu else {
+            let menu = statusItem.menu
+        else {
             return
         }
         // 取消所有菜单追踪，关闭打开的菜单
@@ -777,7 +821,8 @@ class MenuUpdateHelper: NSObject {
     ///   - trigger: 触发时机
     private func handlePostActions(for toolId: String, trigger: PostActionTrigger) {
         guard let toolConfig = ConfigurationDrivenSourceManager.shared.getTool(by: toolId),
-              let postActions = toolConfig.postActions else {
+            let postActions = toolConfig.postActions
+        else {
             return
         }
 
@@ -856,14 +901,16 @@ class MenuUpdateHelper: NSObject {
     ///   - toolConfig: 工具配置
     ///   - path: 自定义路径
     /// - Returns: 版本字符串，检测失败返回 nil
-    private func detectToolWithCustomPath(toolConfig: ToolConfiguration, path: String) async -> String? {
+    private func detectToolWithCustomPath(toolConfig: ToolConfiguration, path: String) async
+        -> String?
+    {
         // 构建可能的可执行文件路径
         let command = toolConfig.detection.command
         let executableNames = [
             command,
             "\(command).sh",
             "bin/\(command)",
-            "bin/\(command).sh"
+            "bin/\(command).sh",
         ]
 
         for name in executableNames {
@@ -872,7 +919,8 @@ class MenuUpdateHelper: NSObject {
             // 检查文件是否存在且可执行
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir),
-                  !isDir.boolValue else {
+                !isDir.boolValue
+            else {
                 continue
             }
 
@@ -894,9 +942,10 @@ class MenuUpdateHelper: NSObject {
                 let versionLine = lines.first?.trimmingCharacters(in: CharacterSet.whitespaces)
 
                 if let version = versionLine,
-                   !version.lowercased().contains("not found") &&
-                   !version.lowercased().contains("command not found") &&
-                   !version.lowercased().contains("error") {
+                    !version.lowercased().contains("not found")
+                        && !version.lowercased().contains("command not found")
+                        && !version.lowercased().contains("error")
+                {
                     debugLog("✅ 版本信息: \(version)")
                     return version
                 }
@@ -944,10 +993,10 @@ class MenuUpdateHelper: NSObject {
         let alert = NSAlert()
         alert.messageText = "无法找到配置文件目录"
         alert.informativeText = """
-        无法找到 \(toolName) 的配置文件目录。
+            无法找到 \(toolName) 的配置文件目录。
 
-        请确保 \(toolName) 已正确安装。
-        """
+            请确保 \(toolName) 已正确安装。
+            """
         alert.alertStyle = .warning
         alert.addButton(withTitle: "确定")
 
@@ -965,13 +1014,15 @@ class MenuUpdateHelper: NSObject {
 
                 // 恢复默认配置后，不重新检测当前源（保持"未选择"状态）
                 // 直接从 ConfigurationDrivenSourceManager 获取最新状态（应该为 nil）
-                let sourceId = ConfigurationDrivenSourceManager.shared.getCurrentSelection(toolId: toolId)
+                let sourceId = ConfigurationDrivenSourceManager.shared.getCurrentSelection(
+                    toolId: toolId)
                 let sources = ConfigurationDrivenSourceManager.shared.getSources(for: toolId)
 
                 // 根据工具 ID 查找对应的组合键
                 if let uniqueKey = self.findKeyForTool(toolId) {
                     if let sourceId = sourceId,
-                       let currentSource = sources.first(where: { $0.id == sourceId }) {
+                        let currentSource = sources.first(where: { $0.id == sourceId })
+                    {
                         // 有匹配的镜像源
                         toolCurrentSources[uniqueKey] = currentSource
                     } else {
@@ -1006,7 +1057,9 @@ class MenuUpdateHelper: NSObject {
     private func createConfigMenuItem() -> NSMenuItem {
         // 创建配置菜单项视图
         let configItemView = MenuItemView(
-            frame: NSRect(x: 0, y: 0, width: LayoutConstants.primaryMenuWidth, height: LayoutConstants.primaryMenuHeight),
+            frame: NSRect(
+                x: 0, y: 0, width: LayoutConstants.primaryMenuWidth,
+                height: LayoutConstants.primaryMenuHeight),
             toolName: "配置...",
             version: nil,
             sourceName: ""
@@ -1125,17 +1178,22 @@ class CustomPathView: NSView {
         // 使用 Auto Layout 约束
         if let pathField = pathField {
             NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
+                textField.leadingAnchor.constraint(
+                    equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
                 textField.centerYAnchor.constraint(equalTo: centerYAnchor),
-                textField.widthAnchor.constraint(equalToConstant: LayoutConstants.secondColumnWidth),
-                pathField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
+                textField.widthAnchor.constraint(
+                    equalToConstant: LayoutConstants.secondColumnWidth),
+                pathField.trailingAnchor.constraint(
+                    equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
                 pathField.centerYAnchor.constraint(equalTo: centerYAnchor),
-                pathField.widthAnchor.constraint(equalToConstant: LayoutConstants.thirdColumnWidth + 30)
+                pathField.widthAnchor.constraint(
+                    equalToConstant: LayoutConstants.thirdColumnWidth + 30),
             ])
         } else {
             NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
-                textField.centerYAnchor.constraint(equalTo: centerYAnchor)
+                textField.leadingAnchor.constraint(
+                    equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
+                textField.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
         }
     }
@@ -1223,7 +1281,7 @@ class CustomPathView: NSView {
             detectionCommand,
             "\(detectionCommand).sh",
             "bin/\(detectionCommand)",
-            "bin/\(detectionCommand).sh"
+            "bin/\(detectionCommand).sh",
         ]
 
         for name in executableNames {
@@ -1231,7 +1289,8 @@ class CustomPathView: NSView {
 
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir),
-                  !isDir.boolValue else {
+                !isDir.boolValue
+            else {
                 continue
             }
 
@@ -1252,10 +1311,10 @@ class CustomPathView: NSView {
         let alert = NSAlert()
         alert.messageText = "无效的 \(toolName) 安装目录"
         alert.informativeText = """
-        在选定目录中未找到 \(toolName) 可执行文件。
+            在选定目录中未找到 \(toolName) 可执行文件。
 
-        请确保 \(toolName) 已正确安装。
-        """
+            请确保 \(toolName) 已正确安装。
+            """
         alert.alertStyle = .warning
         alert.addButton(withTitle: "确定")
 
@@ -1284,9 +1343,11 @@ class CustomPathView: NSView {
 
             // 添加约束
             NSLayoutConstraint.activate([
-                pathField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
+                pathField.trailingAnchor.constraint(
+                    equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
                 pathField.centerYAnchor.constraint(equalTo: centerYAnchor),
-                pathField.widthAnchor.constraint(equalToConstant: LayoutConstants.thirdColumnWidth + 30)
+                pathField.widthAnchor.constraint(
+                    equalToConstant: LayoutConstants.thirdColumnWidth + 30),
             ])
         }
     }
@@ -1346,9 +1407,10 @@ class OpenConfigDirView: NSView {
 
         // 第二列："打开配置文件目录"文字（Auto Layout 约束）
         NSLayoutConstraint.activate([
-            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
+            textField.leadingAnchor.constraint(
+                equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
             textField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            textField.widthAnchor.constraint(equalToConstant: LayoutConstants.secondColumnWidth)
+            textField.widthAnchor.constraint(equalToConstant: LayoutConstants.secondColumnWidth),
         ])
     }
 
@@ -1427,9 +1489,10 @@ class ResetButtonView: NSView {
 
         // 第二列："重置为默认配置"文字（Auto Layout 约束）
         NSLayoutConstraint.activate([
-            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
+            textField.leadingAnchor.constraint(
+                equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
             textField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            textField.widthAnchor.constraint(equalToConstant: LayoutConstants.secondColumnWidth)
+            textField.widthAnchor.constraint(equalToConstant: LayoutConstants.secondColumnWidth),
         ])
     }
 
@@ -1484,8 +1547,8 @@ class MirrorSourceItemView: NSView {
     private let source: MirrorSource
     private let toolId: String
     private let toolName: String
-    private var checkField: NSTextField!   // 选中状态（对勾）
-    private var nameField: NSTextField!   // 镜像源名称
+    private var checkField: NSTextField!  // 选中状态（对勾）
+    private var nameField: NSTextField!  // 镜像源名称
     private var configSourceField: NSTextField!  // 配置源名称
     private var speedField: NSTextField!  // 测速速度
     var onAction: ((MirrorSource, String) -> Void)?
@@ -1540,7 +1603,9 @@ class MirrorSourceItemView: NSView {
         let color: NSColor
         if let ping = source.pingTime {
             speedText = "\(ping)ms"
-            color = ping < SpeedThresholds.fast ? .systemGreen : ping < SpeedThresholds.medium ? .systemYellow : .systemRed
+            color =
+                ping < SpeedThresholds.fast
+                ? .systemGreen : ping < SpeedThresholds.medium ? .systemYellow : .systemRed
         } else {
             speedText = "---"
             color = .systemGray
@@ -1559,19 +1624,23 @@ class MirrorSourceItemView: NSView {
         // 使用 Auto Layout 约束
         NSLayoutConstraint.activate([
             // 第一列：对勾（左对齐，固定宽度）
-            checkField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.firstColumnLeading),
+            checkField.leadingAnchor.constraint(
+                equalTo: leadingAnchor, constant: LayoutConstants.firstColumnLeading),
             checkField.centerYAnchor.constraint(equalTo: centerYAnchor),
             checkField.widthAnchor.constraint(equalToConstant: LayoutConstants.firstColumnWidth),
 
             // 第二列：镜像源名称（扩展以容纳配置源标签）
-            nameField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
+            nameField.leadingAnchor.constraint(
+                equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
             nameField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            nameField.widthAnchor.constraint(equalToConstant: LayoutConstants.secondColumnWidth + 40),  // 增加宽度以显示配置源标签
+            nameField.widthAnchor.constraint(
+                equalToConstant: LayoutConstants.secondColumnWidth + 40),  // 增加宽度以显示配置源标签
 
             // 第三列：测速速度（右对齐到视图边缘）
-            speedField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
+            speedField.trailingAnchor.constraint(
+                equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
             speedField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            speedField.widthAnchor.constraint(equalToConstant: LayoutConstants.thirdColumnWidth)
+            speedField.widthAnchor.constraint(equalToConstant: LayoutConstants.thirdColumnWidth),
         ])
     }
 
@@ -1598,7 +1667,8 @@ class MirrorSourceItemView: NSView {
 
         // 隐藏/显示镜像源选项
         let visibilityTitle = source.isVisible ? "隐藏此源" : "显示此源"
-        let visibilityItem = NSMenuItem(title: visibilityTitle, action: #selector(toggleVisibility), keyEquivalent: "")
+        let visibilityItem = NSMenuItem(
+            title: visibilityTitle, action: #selector(toggleVisibility), keyEquivalent: "")
         visibilityItem.target = self
         menu.addItem(visibilityItem)
 
@@ -1607,7 +1677,8 @@ class MirrorSourceItemView: NSView {
 
         // 显示配置源信息
         if let configSourceName = source.configSourceName {
-            let infoItem = NSMenuItem(title: "配置源: \(configSourceName)", action: nil, keyEquivalent: "")
+            let infoItem = NSMenuItem(
+                title: "配置源: \(configSourceName)", action: nil, keyEquivalent: "")
             infoItem.isEnabled = false
             menu.addItem(infoItem)
         }
@@ -1651,7 +1722,9 @@ class MirrorSourceItemView: NSView {
         let color: NSColor
         if let ping = source.pingTime {
             speedText = "\(ping)ms"
-            color = ping < SpeedThresholds.fast ? .systemGreen : ping < SpeedThresholds.medium ? .systemYellow : .systemRed
+            color =
+                ping < SpeedThresholds.fast
+                ? .systemGreen : ping < SpeedThresholds.medium ? .systemYellow : .systemRed
         } else {
             speedText = "---"
             color = .systemGray
@@ -1716,9 +1789,11 @@ class SpeedTestView: NSView {
 
         // 第二列："测速"文字（Auto Layout 约束）
         NSLayoutConstraint.activate([
-            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
+            textField.leadingAnchor.constraint(
+                equalTo: leadingAnchor, constant: LayoutConstants.secondColumnLeading),
             textField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            textField.widthAnchor.constraint(equalToConstant: LayoutConstants.secondColumnWidth - 2)
+            textField.widthAnchor.constraint(
+                equalToConstant: LayoutConstants.secondColumnWidth - 2),
         ])
 
         if isTesting {
@@ -1731,10 +1806,11 @@ class SpeedTestView: NSView {
 
             // 第三列：旋转指示器（右对齐到视图边缘，Auto Layout 约束）
             NSLayoutConstraint.activate([
-                indicator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
+                indicator.trailingAnchor.constraint(
+                    equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
                 indicator.centerYAnchor.constraint(equalTo: centerYAnchor),
                 indicator.widthAnchor.constraint(equalToConstant: 16),
-                indicator.heightAnchor.constraint(equalToConstant: 16)
+                indicator.heightAnchor.constraint(equalToConstant: 16),
             ])
         }
     }
@@ -1768,10 +1844,11 @@ class SpeedTestView: NSView {
 
             // 第三列：旋转指示器（右对齐到视图边缘，Auto Layout 约束）
             NSLayoutConstraint.activate([
-                indicator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
+                indicator.trailingAnchor.constraint(
+                    equalTo: trailingAnchor, constant: LayoutConstants.thirdColumnTrailing),
                 indicator.centerYAnchor.constraint(equalTo: centerYAnchor),
                 indicator.widthAnchor.constraint(equalToConstant: 16),
-                indicator.heightAnchor.constraint(equalToConstant: 16)
+                indicator.heightAnchor.constraint(equalToConstant: 16),
             ])
         }
 
@@ -1917,26 +1994,35 @@ class MenuItemView: NSView {
         // 使用 Auto Layout 约束
         NSLayoutConstraint.activate([
             // 左列：工具名（左对齐）
-            nameTextField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: LayoutConstants.toolNameLeading),
+            nameTextField.leadingAnchor.constraint(
+                equalTo: leadingAnchor, constant: LayoutConstants.toolNameLeading),
             nameTextField.centerYAnchor.constraint(equalTo: centerYAnchor),
 
             // 次左列：版本号（在工具名右侧，使用 baseline 对齐）
-            versionTextField.leadingAnchor.constraint(equalTo: nameTextField.trailingAnchor, constant: LayoutConstants.versionSpacing),
-            versionTextField.lastBaselineAnchor.constraint(equalTo: nameTextField.lastBaselineAnchor),
-            versionTextField.widthAnchor.constraint(lessThanOrEqualToConstant: LayoutConstants.versionMaxWidth),
+            versionTextField.leadingAnchor.constraint(
+                equalTo: nameTextField.trailingAnchor, constant: LayoutConstants.versionSpacing),
+            versionTextField.lastBaselineAnchor.constraint(
+                equalTo: nameTextField.lastBaselineAnchor),
+            versionTextField.widthAnchor.constraint(
+                lessThanOrEqualToConstant: LayoutConstants.versionMaxWidth),
 
             // 右列：当前源名称（在箭头左侧）
-            sourceTextField.trailingAnchor.constraint(equalTo: arrowTextField.leadingAnchor, constant: LayoutConstants.sourceArrowSpacing),
+            sourceTextField.trailingAnchor.constraint(
+                equalTo: arrowTextField.leadingAnchor, constant: LayoutConstants.sourceArrowSpacing),
             sourceTextField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            sourceTextField.widthAnchor.constraint(lessThanOrEqualToConstant: LayoutConstants.sourceMaxWidth),
+            sourceTextField.widthAnchor.constraint(
+                lessThanOrEqualToConstant: LayoutConstants.sourceMaxWidth),
 
             // 最右侧：箭头图标
-            arrowTextField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: LayoutConstants.arrowTrailing),
+            arrowTextField.trailingAnchor.constraint(
+                equalTo: trailingAnchor, constant: LayoutConstants.arrowTrailing),
             arrowTextField.centerYAnchor.constraint(equalTo: centerYAnchor),
             arrowTextField.widthAnchor.constraint(equalToConstant: LayoutConstants.arrowWidth),
 
             // 确保版本号在源名称左侧
-            versionTextField.trailingAnchor.constraint(lessThanOrEqualTo: sourceTextField.leadingAnchor, constant: -LayoutConstants.sourceVersionSpacing)
+            versionTextField.trailingAnchor.constraint(
+                lessThanOrEqualTo: sourceTextField.leadingAnchor,
+                constant: -LayoutConstants.sourceVersionSpacing),
         ])
     }
 
